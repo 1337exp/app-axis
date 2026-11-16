@@ -26,6 +26,11 @@ export default {
         active: 'в работе: {0}',
         questions: 'открытых вопросов: {0}',
     },
+    undo: {
+        action: 'Отменить',
+        due: 'срок {0}',
+        noDue: 'без срока',
+    },
     view: {
         label: 'Вид',
         tree: 'Дерево',

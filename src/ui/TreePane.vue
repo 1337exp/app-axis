@@ -6,11 +6,10 @@
  * Дерево проекта и быстрый ввод под ним. Строка показывает, что это за запись, насколько она продвинулась
  * и кто трогал её последним; поле внизу превращает строку в запись, не отрывая рук от клавиатуры.
  */
-import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoSelect, TaoTree, confirm, toast } from '@1337exp/taoui';
+import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoTree, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
-import { RECORD_TYPES } from '@/core/model';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
 import { percent, progressOf } from '@/core/tree';
@@ -20,6 +19,7 @@ import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
 import { isOverdue } from './marks';
 import StatusMark from './StatusMark.vue';
+import TypeSelect from './TypeSelect.vue';
 
 const { t } = useI18n();
 
@@ -107,7 +107,6 @@ async function act(action: string, record: AxisRecord): Promise<void> {
 
 const line = ref('');
 const type = ref<RecordType>('task');
-const typeOptions = computed(() => RECORD_TYPES.map((value) => ({ value, label: t(`type.${value}`) })));
 const quick = ref<HTMLElement | null>(null);
 const focusQuick = (): void => quick.value?.querySelector('input')?.focus();
 
@@ -194,10 +193,10 @@ async function add(): Promise<void> {
 
         <form ref="quick" class="quick" @submit.prevent="add">
             <div class="quick__row">
-                <TaoSelect v-model="type" class="quick__type" :options="typeOptions" :clearable="false" :aria-label="t('quick.type')" />
                 <TaoInput v-model="line" class="quick__input" :placeholder="t('quick.placeholder')" :aria-label="t('quick.placeholder')" autocomplete="off" />
                 <TaoButton type="submit" icon="tao-plus" :aria-label="t('quick.add')" :disabled="!parsed" />
             </div>
+            <TypeSelect v-model="type" class="quick__type" :aria-label="t('quick.type')" />
             <p class="quick__hint">
                 <template v-if="parsed">
                     <strong>{{ t(`type.${parsed.type}`) }}</strong> {{ placeText }}
@@ -302,16 +301,17 @@ async function add(): Promise<void> {
 
 .quick__row {
     display: flex;
+    flex-wrap: wrap; /* on a very narrow pane the button drops under the field instead of squeezing it / на совсем узкой панели кнопка уходит под поле, а не сжимает его */
     gap: var(--tao-space-2);
 }
 
 .quick__type {
-    flex: none;
-    width: 132px;
+    width: 148px;
+    margin-top: var(--tao-space-2);
 }
 
 .quick__input {
-    flex: 1;
+    flex: 1 1 110px;
     min-width: 0;
 }
 

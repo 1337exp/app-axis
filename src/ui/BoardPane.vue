@@ -10,9 +10,9 @@
  * или своим меню; клик открывает запись в панели справа. Данные те же реактивные, что и у дерева,
  * поэтому правка снаружи двигает карточку сама.
  */
-import { TaoEmpty, toast } from '@1337exp/taoui';
+import { TaoEmpty } from '@1337exp/taoui';
 import { computed, ref } from 'vue';
-import { hasDraft, patchRecord, select, state } from '@/app/state';
+import { hasDraft, select, state } from '@/app/state';
 import { groupByStatus } from '@/core/board';
 import type { AxisRecord, Status } from '@/core/model';
 import { areaPathOf } from '@/core/tree';
@@ -20,6 +20,7 @@ import { useI18n } from '@/i18n';
 import BoardCard from './BoardCard.vue';
 import FilterBar from './FilterBar.vue';
 import RecordDrawer from './RecordDrawer.vue';
+import { changeStatus } from './undoable';
 import { useViewFilter } from './useViewFilter';
 
 const { t } = useI18n();
@@ -32,14 +33,7 @@ const { filter, root, rootId, areaOptions, typeOn, setType } = useViewFilter('bo
 const columns = computed(() => groupByStatus(state.records, { types: filter.types, root: rootId.value }));
 const total = computed(() => columns.value.reduce((sum, column) => sum + column.records.length, 0));
 
-async function setStatus(record: AxisRecord, status: Status): Promise<void> {
-    if (record.status === status) return;
-    try {
-        await patchRecord(record.id, { status });
-    } catch (error) {
-        toast().danger().message(error instanceof Error ? error.message : String(error));
-    }
-}
+const setStatus = (record: AxisRecord, status: Status): Promise<void> => changeStatus(record, status);
 
 // ───────────────────────────── dragging / перетаскивание ─────────────────────────────
 

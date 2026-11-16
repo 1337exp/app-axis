@@ -10,13 +10,13 @@
  * `TaoDate` из TaoUI это целое поле (рамка с датой) и компактного вида у него нет, поэтому кнопка это `TaoPopover`
  * с `TaoCalendar`, из которых сам `TaoDate` и собран.
  */
-import { TaoButton, TaoCalendar, TaoPopover, toast } from '@1337exp/taoui';
+import { TaoButton, TaoCalendar, TaoPopover } from '@1337exp/taoui';
 import { nextTick, ref, watch } from 'vue';
-import { patchRecord } from '@/app/state';
 import type { AxisRecord } from '@/core/model';
 import { useI18n } from '@/i18n';
+import { changeDue } from './undoable';
 
-const props = defineProps<{ record: Pick<AxisRecord, 'id' | 'due'> }>();
+const props = defineProps<{ record: Pick<AxisRecord, 'id' | 'title' | 'type' | 'due'> }>();
 
 const { t } = useI18n();
 const open = ref(false);
@@ -32,12 +32,7 @@ watch(open, async (isOpen) => {
 async function choose(value: unknown): Promise<void> {
     const due = typeof value === 'string' ? value : null;
     open.value = false;
-    if (due === props.record.due) return;
-    try {
-        await patchRecord(props.record.id, { due });
-    } catch (error) {
-        toast().danger().message(error instanceof Error ? error.message : String(error));
-    }
+    await changeDue(props.record, due);
 }
 </script>
 

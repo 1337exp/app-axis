@@ -8,11 +8,11 @@
  * (не начата, в работе, готова, не начата…); у других типов такого быстрого хода нет, и отметка простая.
  * Дерево и лента рисуют её одинаково, поэтому она живёт тут один раз.
  */
-import { TaoIcon, toast } from '@1337exp/taoui';
-import { patchRecord } from '@/app/state';
+import { TaoIcon } from '@1337exp/taoui';
 import type { AxisRecord } from '@/core/model';
 import { useI18n } from '@/i18n';
 import { nextStatus, recordIcon, toneClass } from './marks';
+import { changeStatus } from './undoable';
 
 const props = defineProps<{
     record: AxisRecord;
@@ -23,11 +23,7 @@ const props = defineProps<{
 const { t } = useI18n();
 
 async function toggle(): Promise<void> {
-    try {
-        await patchRecord(props.record.id, { status: nextStatus(props.record.status) });
-    } catch (error) {
-        toast().danger().message(error instanceof Error ? error.message : String(error));
-    }
+    await changeStatus(props.record, nextStatus(props.record.status));
 }
 </script>
 

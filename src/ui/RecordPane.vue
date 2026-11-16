@@ -24,13 +24,14 @@ import { ApiError, api } from '@/app/api';
 import type { RecordPatch } from '@/app/api';
 import { countInside, dropDraft, hasDraft, loadDraft, patchRecord, recordById, removeRecord, select, selectedRecord, state, writeDraft } from '@/app/state';
 import type { JournalEntry } from '@/core/journal';
-import { LINK_KINDS, RECORD_TYPES, STATUSES, hasStatus } from '@/core/model';
+import { LINK_KINDS, STATUSES, hasStatus } from '@/core/model';
 import type { AxisDraft, AxisRecord, LinkKind, RecordType, Status } from '@/core/model';
 import { pathOf } from '@/core/tree';
 import { LOCALES, current, useI18n } from '@/i18n';
 import { formatDay, formatTime, dayOf } from './format';
 import JournalList from './JournalList.vue';
 import { recordIcon, statusKeyOf, toneClass } from './marks';
+import TypeSelect from './TypeSelect.vue';
 
 const { t } = useI18n();
 const record = selectedRecord;
@@ -319,7 +320,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', flushNow));
 
 // ───────────────────────────── type, status, due / тип, статус, срок ─────────────────────────────
 
-const typeOptions = computed(() => RECORD_TYPES.map((value) => ({ value, label: t(`type.${value}`) })));
 const statusKey = computed(() => statusKeyOf(record.value?.type ?? 'task'));
 
 const type = computed({
@@ -504,7 +504,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
         </div>
 
         <div class="record__props">
-            <TaoSelect v-model="type" class="record__type" :options="typeOptions" :clearable="false" :aria-label="t('record.type')" />
+            <TypeSelect v-model="type" class="record__type" :aria-label="t('record.type')" />
             <TaoSegmented v-if="hasStatus(record.type)" v-model="status" :aria-label="t('record.status')">
                 <TaoSegmentedOption v-for="s in STATUSES" :key="s" :value="s" :label="t(`status.${statusKey}.${s}`)" />
             </TaoSegmented>

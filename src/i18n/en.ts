@@ -28,6 +28,11 @@ const en: typeof ru = {
         active: 'in work: {0}',
         questions: 'open questions: {0}',
     },
+    undo: {
+        action: 'Undo',
+        due: 'due {0}',
+        noDue: 'no date',
+    },
     view: {
         label: 'View',
         tree: 'Tree',
