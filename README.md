@@ -19,6 +19,7 @@ npm run typecheck
 ## What it does
 
 - **The tree of a project.** An area gathers records into a branch and shows its progress (tasks done out of all, dropped ones do not count). A click on the circle of a task moves it round: not started, in work, done. A row shows the due date (red when late), whether there is a text and pictures, and a "C" mark when Claude edited the record last.
+- **Board.** The same records in four columns by status (not started, in work, done, dropped): what is in work right now and what is next. A card shows the type, the title, the areas above it, the due date and the "C" mark. Drag a card to another column or use the menu on the card (it names the statuses with the words of the record's type); a click opens the record in a drawer on the right. Filters by type (tasks and questions by default) and by branch are kept per project.
 - **Quick input.** The field under the tree: a line and `Enter`. A mark at the start sets the type: `?` question, `!` decision, `*` idea, `#` area, `-` task, `~` note; a word works too (`idea: …`, `todo: …`). The record lands in the selected area or right after the selected record, so a list is typed top to bottom.
 - **A record.** Title, type, status (each type has its own words: a decision is "Accepted", a question is "Answered"), due date, a text in the editor with headings, lists, tables and code. There is no Save button: a change goes by itself.
 - **Pictures.** Paste from the clipboard (`Ctrl+V`), drop, or the button. A file is named by the hash of its content, so the same picture is stored once.
@@ -26,7 +27,7 @@ npm run typecheck
 - **The journal.** Every change: who (you or Claude), what, when and why; plus free notes on the whole project or on a record. Append-only.
 - **Status bar.** One thin line at the bottom: the progress of the open project, tasks done out of all, tasks in work, open questions. On a narrow window the less important counts drop out.
 - **Live.** The server watches the data folder: a change by Claude, from another tab or by hand in a file shows on the page by itself.
-- Russian and English, light and dark themes, the address of a record in the address bar (`#/project/record`).
+- Russian and English, light and dark themes, the address of a record or a view in the address bar (`#/project/record`, `#/project/~board`, `#/project/~board/record`, `#/project/~journal`).
 
 ## Where the data lives
 
@@ -57,10 +58,10 @@ The same access exists over HTTP (`/api/projects/…`, the header `X-Axis-By: cl
 ## How it is built
 
 ```
-src/core/     plain TypeScript, no DOM and no Node: the model, the tree and progress, quick input, text ↔ document, the journal
+src/core/     plain TypeScript, no DOM and no Node: the model, the tree and progress, the board columns, quick input, text ↔ document, the journal
 server/       the file store, the HTTP API with an event stream, the standalone server, the MCP server, the agent's view
 src/app/      the state of the page, the API client, live updates, the address
-src/ui/       the tree with quick input, a record, the journal, the new project window
+src/ui/       the tree with quick input, the board, a record, the journal, the new project window
 src/i18n/     dictionaries ru / en
 tests/        the core and the store (on a temporary folder)
 ```
@@ -69,7 +70,7 @@ The server answers this machine only: it listens on `127.0.0.1`, refuses a forei
 
 ## Not yet
 
-A board by status, a timeline and a map on a canvas (views of the same data). Dragging records in the tree with the mouse (for now "Move up", "Move down", "One level up" in the row menu). Pictures inside the text. Undo. Access from another device. Checked by hand in Chromium; Firefox, Safari, touch screens and a narrow screen are not checked. There are no tests of the page components yet, only of the core and the store.
+A timeline and a map on a canvas (views of the same data). Dragging records in the tree with the mouse (for now "Move up", "Move down", "One level up" in the row menu). Pictures inside the text. Undo. Access from another device. Checked by hand in Chromium; Firefox, Safari, touch screens and a narrow screen are not checked. There are no tests of the page components yet, only of the core and the store.
 
 ## License
 

@@ -16,8 +16,8 @@ import { parseQuick } from '@/core/quick';
 import { percent, progressOf } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { current, useI18n } from '@/i18n';
-import { formatShort, today } from './format';
-import { nextStatus, recordIcon, toneClass } from './marks';
+import { formatShort } from './format';
+import { isOverdue, nextStatus, recordIcon, toneClass } from './marks';
 
 const { t } = useI18n();
 
@@ -61,8 +61,6 @@ function row(id: string): { record: AxisRecord; done: number; total: number; sha
     const p = node.children.length > 0 ? progressOf(node) : { done: 0, total: 0 };
     return { record: node.record, done: p.done, total: p.total, share: percent({ ...p, active: 0, questions: 0 }) };
 }
-
-const overdue = (record: AxisRecord): boolean => record.due !== null && record.due < today() && record.status !== 'done' && record.status !== 'dropped';
 
 async function run(work: () => Promise<unknown>): Promise<void> {
     try {
@@ -182,7 +180,7 @@ async function add(): Promise<void> {
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
                             <TaoIcon v-if="r.record.images.length > 0" class="row__mark" name="image" />
                             <span v-if="r.record.updatedBy === 'claude'" class="row__claude" :title="t('tree.byClaude')">C</span>
-                            <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': overdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
+                            <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': isOverdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
                             <span v-if="r.total > 0" class="row__progress" :title="t('project.tasks', [r.done, r.total])">
                                 <span class="row__bar"><span class="row__fill" :style="{ width: `${r.share}%` }"></span></span>
                                 {{ r.done }}/{{ r.total }}

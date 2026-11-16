@@ -21,7 +21,7 @@ import { pathOf } from '@/core/tree';
 import { LOCALES, current, useI18n } from '@/i18n';
 import { formatDay, formatTime, dayOf } from './format';
 import JournalList from './JournalList.vue';
-import { recordIcon, toneClass } from './marks';
+import { recordIcon, statusKeyOf, toneClass } from './marks';
 
 const { t } = useI18n();
 const record = selectedRecord;
@@ -109,10 +109,7 @@ function saveTitle(): void {
 // ───────────────────────────── type, status, due / тип, статус, срок ─────────────────────────────
 
 const typeOptions = computed(() => RECORD_TYPES.map((value) => ({ value, label: t(`type.${value}`) })));
-const statusKey = computed(() => {
-    const type = record.value?.type;
-    return type === 'idea' || type === 'decision' || type === 'question' ? type : 'task';
-});
+const statusKey = computed(() => statusKeyOf(record.value?.type ?? 'task'));
 
 const type = computed({
     get: () => record.value?.type ?? 'note',

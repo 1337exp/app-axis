@@ -29,7 +29,20 @@ export default {
     view: {
         label: 'Вид',
         tree: 'Дерево',
+        board: 'Доска',
         journal: 'Журнал',
+    },
+    board: {
+        label: 'Доска по статусам',
+        filters: 'Фильтры доски',
+        types: 'Типы записей',
+        branch: 'Ветка',
+        wholeProject: 'Весь проект',
+        empty: 'Карточек нет',
+        emptyText: 'На доске записи со статусом выбранных типов. Включи другие типы или выбери другую ветку.',
+        columnEmpty: 'Пусто',
+        cardActions: 'Статус записи',
+        status: { open: 'Не начато', active: 'В работе', done: 'Готово', dropped: 'Отброшено' },
     },
     tree: {
         label: 'Записи проекта',

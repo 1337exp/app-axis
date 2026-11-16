@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * The shell: the header (which project, which view) and under it the tree beside the open record,
- * or the journal; at the bottom the status bar with the progress.
+ * the board by status over the whole width, or the journal; at the bottom the status bar with the progress.
  *
- * Оболочка: шапка (какой проект, какой вид) и под ней дерево рядом с открытой записью
- * или журнал; внизу строка состояния с прогрессом.
+ * Оболочка: шапка (какой проект, какой вид) и под ней дерево рядом с открытой записью,
+ * доска по статусам на всю ширину или журнал; внизу строка состояния с прогрессом.
  */
 import { TaoAlert, TaoButton, TaoEmpty, TaoLoader, TaoSegmented, TaoSegmentedOption, TaoSelect, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
 import { computed, ref, watch } from 'vue';
@@ -12,6 +12,7 @@ import { openProject, setView, start, state } from '@/app/state';
 import type { View } from '@/app/state';
 import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
+import BoardPane from '@/ui/BoardPane.vue';
 import JournalPane from '@/ui/JournalPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
 import RecordPane from '@/ui/RecordPane.vue';
@@ -60,6 +61,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
 
             <TaoSegmented v-if="state.project" v-model="view" :aria-label="t('view.label')">
                 <TaoSegmentedOption value="tree" icon="tree" :label="t('view.tree')" />
+                <TaoSegmentedOption value="board" icon="board" :label="t('view.board')" />
                 <TaoSegmentedOption value="journal" icon="journal" :label="t('view.journal')" />
             </TaoSegmented>
             <TaoSelect v-model="locale" class="bar__locale" :options="localeOptions" :clearable="false" :aria-label="t('app.language')" />
@@ -80,6 +82,8 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
                 </template>
             </TaoEmpty>
             <div v-else-if="state.view === 'journal'" class="app__scroll"><JournalPane /></div>
+            <BoardPane v-else-if="state.view === 'board'" />
+
             <TaoSplit v-else v-model="split" class="app__split" :min="22" :max="70">
                 <template #start><TreePane /></template>
                 <template #end>

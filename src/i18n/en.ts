@@ -31,7 +31,20 @@ const en: typeof ru = {
     view: {
         label: 'View',
         tree: 'Tree',
+        board: 'Board',
         journal: 'Journal',
+    },
+    board: {
+        label: 'Board by status',
+        filters: 'Board filters',
+        types: 'Types of records',
+        branch: 'Branch',
+        wholeProject: 'Whole project',
+        empty: 'No cards',
+        emptyText: 'The board shows records that have a status, of the chosen types. Turn on other types or pick another branch.',
+        columnEmpty: 'Empty',
+        cardActions: 'Record status',
+        status: { open: 'Not started', active: 'In work', done: 'Done', dropped: 'Dropped' },
     },
     tree: {
         label: 'Records of the project',

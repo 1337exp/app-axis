@@ -4,6 +4,7 @@
  */
 import { hasStatus } from '@/core/model';
 import type { AxisRecord, RecordType, Status } from '@/core/model';
+import { today } from './format';
 
 const TYPE_ICON: Record<RecordType, string> = {
     area: 'tao-folder',
@@ -30,6 +31,14 @@ export function toneClass(record: Pick<AxisRecord, 'type' | 'status'>): string {
     if (!hasStatus(record.type)) return 'mark--plain';
     return `mark--${record.status}`;
 }
+
+/** Which set of status words a type uses (`status.<key>.<status>` in the dictionaries); a task's words are the fallback. */
+export const statusKeyOf = (type: RecordType): 'task' | 'idea' | 'decision' | 'question' =>
+    type === 'idea' || type === 'decision' || type === 'question' ? type : 'task';
+
+/** A due date in the past on a record that is not finished: the tree row and the board card show it red. */
+export const isOverdue = (record: Pick<AxisRecord, 'due' | 'status'>): boolean =>
+    record.due !== null && record.due < today() && record.status !== 'done' && record.status !== 'dropped';
 
 /** The next status on a click on the mark of a task. / Следующий статус по клику на отметку задачи. */
 export const nextStatus = (status: Status): Status => (status === 'open' ? 'active' : status === 'active' ? 'done' : 'open');

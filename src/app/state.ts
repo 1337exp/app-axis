@@ -11,7 +11,7 @@ import { buildTree, descendants, progressOfAll } from '@/core/tree';
 import { ApiError, api } from './api';
 import type { RecordPatch } from './api';
 
-export type View = 'tree' | 'journal';
+export type View = 'tree' | 'board' | 'journal';
 
 export const state = reactive({
     /** The first load is over (with or without success). / Первая загрузка закончена. */
@@ -34,17 +34,23 @@ export const selectedRecord = computed(() => state.records.find((r) => r.id === 
 export const recordById = (id: string): AxisRecord | undefined => state.records.find((r) => r.id === id);
 
 // ───────────────────────────── the address / адрес ─────────────────────────────
-// #/<project>            the tree
-// #/<project>/<record>   a record
-// #/<project>/~journal   the journal
+// #/<project>                  the tree
+// #/<project>/<record>          a record in the tree
+// #/<project>/~board            the board
+// #/<project>/~board/<record>   the board with that record open in the drawer
+// #/<project>/~journal          the journal
+// The view is part of the address, so a reload brings back the same screen. / Вид входит в адрес: после перезагрузки тот же экран.
 
 function readHash(): { project: string; record: string | null; view: View } {
-    const [project = '', rest = ''] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
-    return { project, record: rest && !rest.startsWith('~') ? rest : null, view: rest === '~journal' ? 'journal' : 'tree' };
+    const [project = '', rest = '', third = ''] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
+    if (rest === '~board') return { project, record: third || null, view: 'board' };
+    if (rest === '~journal') return { project, record: null, view: 'journal' };
+    return { project, record: rest && !rest.startsWith('~') ? rest : null, view: 'tree' };
 }
 
 function writeHash(): void {
-    const tail = state.view === 'journal' ? '/~journal' : state.selected ? `/${state.selected}` : '';
+    const tail =
+        state.view === 'journal' ? '/~journal' : state.view === 'board' ? `/~board${state.selected ? `/${state.selected}` : ''}` : state.selected ? `/${state.selected}` : '';
     const hash = state.projectId ? `#/${state.projectId}${tail}` : '';
     if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname);
 }
@@ -110,12 +116,15 @@ export async function refresh(): Promise<void> {
 
 export function select(id: string | null): void {
     state.selected = id;
-    if (id) state.view = 'tree';
+    // a record picked in the journal is shown in the tree; on the board it opens in the drawer and the board stays
+    if (id && state.view === 'journal') state.view = 'tree';
     writeHash();
 }
 
 export function setView(view: View): void {
     state.view = view;
+    // on the board a selected record means an open drawer: arriving there must not open one
+    if (view === 'board') state.selected = null;
     writeHash();
 }
 
