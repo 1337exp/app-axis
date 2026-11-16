@@ -78,3 +78,34 @@ describe('the draft over HTTP', () => {
         expect((await send('PATCH', `/records/${r.id}`, { text: 'again' }, 'claude')).status).toBe(200);
     });
 });
+
+describe('the map over HTTP', () => {
+    it('keeps places and the camera in map.json, not in a record and not in the journal, and drops the places of deleted records', async () => {
+        const a = store.createRecord('demo', { type: 'task', title: 'A' }, 'user');
+        const b = store.createRecord('demo', { type: 'task', title: 'B' }, 'user');
+        const journal = store.journal('demo').length;
+        expect((await send('GET', '/map')).data).toEqual({ map: { v: 1, positions: {} } });
+
+        const put = await send('PATCH', '/map', { positions: { [a.id]: { x: 10, y: 20 }, [b.id]: { x: 30, y: 40 } }, camera: { x: 1, y: 2, zoom: 0.5 } });
+        expect(put.status).toBe(200);
+        expect(put.data.map.positions[a.id]).toEqual({ x: 10, y: 20 });
+        expect((await send('PATCH', '/map', { positions: { [a.id]: null } })).data.map.positions).toEqual({ [b.id]: { x: 30, y: 40 } });
+        expect((await send('GET', '/map')).data.map.camera).toEqual({ x: 1, y: 2, zoom: 0.5 });
+
+        // a move is not a change of the project
+        expect(store.journal('demo').length).toBe(journal);
+        expect(store.record('demo', b.id).updated).toBe(b.updated);
+
+        store.deleteRecord('demo', b.id, 'user');
+        expect((await send('GET', '/map')).data.map.positions).toEqual({});
+        expect((await send('PATCH', '/map', { camera: null })).data.map.camera).toBeUndefined();
+    });
+
+    it('refuses what is not a place', async () => {
+        expect((await send('PATCH', '/map', { positions: { 'bad id!': { x: 1, y: 1 } } })).status).toBe(400);
+        expect((await send('PATCH', '/map', { positions: { a: { x: 'no', y: 1 } } })).status).toBe(400);
+        expect((await send('PATCH', '/map', { positions: [] })).status).toBe(400);
+        expect((await send('PATCH', '/map', { camera: { x: 1, y: 1, zoom: 0 } })).status).toBe(400);
+        expect((await send('DELETE', '/map')).status).toBe(405);
+    });
+});

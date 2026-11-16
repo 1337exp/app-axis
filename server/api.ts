@@ -77,14 +77,26 @@ function send(res: ServerResponse, status: number, body: unknown): void {
 export function createApi(store: Store): Api {
     const listeners = new Set<ServerResponse>();
     const pending = new Set<string>();
+    /**
+     * What changed in a burst, per project: `map.json` (and its temporary file), or anything else. A project where only the map
+     * changed does not make the page take the whole project again.
+     * Что менялось за всплеск, по проектам: `map.json` (и его временный файл) или что-то другое. Проект, где менялась только
+     * карта, не заставляет страницу брать проект целиком.
+     */
+    const mapSeen = new Set<string>();
+    const otherSeen = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | null = null;
     let watcher: FSWatcher | null = null;
 
     const flush = (): void => {
         timer = null;
-        const projects = [...pending];
+        const mapOnly = (p: string): boolean => mapSeen.has(p) && !otherSeen.has(p);
+        const projects = [...pending].filter((p) => !mapOnly(p));
+        const maps = [...pending].filter(mapOnly);
         pending.clear();
-        const data = `data: ${JSON.stringify({ projects })}\n\n`;
+        mapSeen.clear();
+        otherSeen.clear();
+        const data = `data: ${JSON.stringify({ projects, maps })}\n\n`;
         for (const res of listeners) res.write(data);
     };
 
@@ -94,6 +106,11 @@ export function createApi(store: Store): Api {
             // the first part of the path is the project folder; a new or removed project changes the list itself
             const project = String(file).split(/[\\/]/)[0] ?? '';
             if (!isId(project)) return;
+            const name = String(file).split(/[\\/]/).slice(1).join('/');
+            const isMap = name === 'map.json' || name.startsWith('map.json.tmp-');
+            // the folder of the project itself (its entry changes whenever a file inside does) says nothing: the files say what changed
+            if (isMap) mapSeen.add(project);
+            else if (name !== '') otherSeen.add(project);
             pending.add(project);
             timer ??= setTimeout(flush, 60);
         });
@@ -158,6 +175,13 @@ export function createApi(store: Store): Api {
                 return send(res, 200, { deleted: store.deleteRecord(project, item, author(req), why) });
             }
             throw new AxisError(405, 'GET, PATCH or DELETE');
+        }
+
+        if (section === 'map') {
+            // where the cards of the map sit: a file of its own, not a record and not a journal line
+            if (method === 'GET') return send(res, 200, { map: store.map(project) });
+            if (method === 'PATCH') return send(res, 200, { map: store.patchMap(project, await readJsonBody(req)) });
+            throw new AxisError(405, 'GET or PATCH');
         }
 
         if (section === 'journal') {

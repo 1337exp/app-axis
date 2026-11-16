@@ -12,10 +12,12 @@
  */
 import { toast } from '@1337exp/taoui';
 import { patchRecord } from '@/app/state';
-import type { AxisRecord, Status } from '@/core/model';
+import type { AxisRecord, RecordLink, Status } from '@/core/model';
 import { current, translate } from '@/i18n';
 import { formatShort } from './format';
 import { statusKeyOf } from './marks';
+
+export { offer as offerUndo };
 
 const TOAST_ID = 'axis-undo';
 const TOAST_MS = 6000;
@@ -66,4 +68,19 @@ export async function changeDue(record: Subject & Pick<AxisRecord, 'due'>, due: 
     }
     const text = due ? translate(current.value, 'undo.due', [formatShort(due, current.value)]) : translate(current.value, 'undo.noDue');
     offer(`${record.title}: ${text}`, () => patchRecord(record.id, { due: before }));
+}
+
+/**
+ * Sets the links of a record (one added or one removed) and offers to put the previous ones back; `message` is the toast text.
+ * Ставит связи записи (одна добавлена или одна убрана) и предлагает вернуть прежние; `message` текст тоста.
+ */
+export async function changeLinks(record: Pick<AxisRecord, 'id' | 'links'>, links: RecordLink[], message: string): Promise<void> {
+    const before = record.links;
+    try {
+        await patchRecord(record.id, { links });
+    } catch (error) {
+        fail(error);
+        return;
+    }
+    offer(message, () => patchRecord(record.id, { links: before }));
 }

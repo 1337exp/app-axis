@@ -2,6 +2,8 @@ import TaoUI from '@1337exp/taoui';
 import { createApp } from 'vue';
 
 import '@1337exp/taoui/styles.css';
+import '@1337exp/taoux/canvas.css';
+import '@1337exp/taoux/taoui.css'; // the bridge: the canvas follows the TaoUI theme / мост: холст следует теме TaoUI
 import 'prosemirror-view/style/prosemirror.css';
 import '@1337exp/taoeditor/content.css';
 import '@1337exp/taoeditor/editor.css';

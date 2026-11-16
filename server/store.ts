@@ -7,6 +7,7 @@
  *   <data>/<project>/journal.jsonl         a line per change, appended
  *   <data>/<project>/assets/<name>         pictures
  *   <data>/<project>/drafts/<id>.json       an unsaved text of a record: { body, base, at, by } (not in the journal)
+ *   <data>/<project>/map.json              where the cards of the map sit and the camera: { v, positions, camera } (not in the journal)
  *   <data>/<project>/trash/<id>.json       what was deleted (nothing is unlinked)
  *   <data>/<project>/trash/<id>.draft.json the draft of a deleted record
  *
@@ -34,6 +35,8 @@ import {
     normalizeRecord,
 } from '../src/core/model.ts';
 import type { Author, AxisDraft, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
+import { isCamera, isPoint, normalizeMap, patchMap } from '../src/core/map.ts';
+import type { MapData, MapPatch } from '../src/core/map.ts';
 import { textToDoc } from '../src/core/text.ts';
 import { canMove, descendants, orderFor, progressOfAll } from '../src/core/tree.ts';
 
@@ -148,6 +151,10 @@ export interface Store {
     deleteDraft(project: string, id: string): boolean;
     /** Ids of the records that have a draft. / Id записей, у которых есть черновик. */
     drafts(project: string): string[];
+    /** The map of the project: where the cards sit and the camera. Places of records that are gone are dropped. / Карта проекта: где стоят карточки и камера. Места исчезнувших записей отбрасываются. */
+    map(project: string): MapData;
+    /** Applies a partial change to `map.json` (`null` removes a place or the camera). Not in the journal. / Применяет частичную правку к `map.json`. В журнал не идёт. */
+    patchMap(project: string, input: unknown): MapData;
     journal(project: string, options?: { limit?: number; record?: string }): JournalEntry[];
     /** A free note in the journal. / Свободная заметка в журнале. */
     log(project: string, text: unknown, record: unknown, by: Author): JournalEntry;
@@ -468,6 +475,33 @@ export function createStore(root: string): Store {
                 .map((name) => name.slice(0, -'.json'.length))
                 .filter((id) => isId(id) && readDraft(project, id) !== null)
                 .sort();
+        },
+
+        map(project) {
+            const known = new Set(readRecords(project).map((r) => r.id));
+            return normalizeMap(readJson(join(dir(project), 'map.json')), known);
+        },
+
+        patchMap(project, input) {
+            if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new AxisError(400, 'The body must be a JSON object');
+            const body = input as { positions?: unknown; camera?: unknown };
+            const patch: MapPatch = {};
+            if (body.positions !== undefined) {
+                if (typeof body.positions !== 'object' || body.positions === null || Array.isArray(body.positions)) throw new AxisError(400, '"positions" is { <recordId>: { x, y } | null }');
+                patch.positions = {};
+                for (const [id, point] of Object.entries(body.positions)) {
+                    if (!isId(id)) throw new AxisError(400, `Bad record id: ${id}`);
+                    if (point !== null && !isPoint(point)) throw new AxisError(400, `A place is { x, y } (numbers) or null: ${id}`);
+                    patch.positions[id] = point;
+                }
+            }
+            if (body.camera !== undefined) {
+                if (body.camera !== null && !isCamera(body.camera)) throw new AxisError(400, '"camera" is { x, y, zoom } or null');
+                patch.camera = body.camera;
+            }
+            const next = patchMap(this.map(project), patch);
+            writeJson(join(dir(project), 'map.json'), next);
+            return next;
         },
 
         journal(project, options = {}) {

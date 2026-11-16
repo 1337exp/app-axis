@@ -20,7 +20,7 @@ const WHOLE = '*';
 export function useViewFilter(scope: ViewScope) {
     const { t } = useI18n();
 
-    const filter = reactive(defaultFilter());
+    const filter = reactive(defaultFilter(scope));
     watch(
         () => state.projectId,
         (id) => Object.assign(filter, readFilter(scope, id)),

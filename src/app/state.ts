@@ -12,7 +12,7 @@ import { buildTree, descendants, progressOfAll } from '@/core/tree';
 import { ApiError, api } from './api';
 import type { RecordPatch } from './api';
 
-export type View = 'tree' | 'board' | 'timeline' | 'journal';
+export type View = 'tree' | 'board' | 'timeline' | 'map' | 'journal';
 
 export const state = reactive({
     /** The first load is over (with or without success). / Первая загрузка закончена. */
@@ -55,11 +55,13 @@ let treeSelected: string | null = null;
 // #/<project>/~board/<record>   the board with that record open in the drawer
 // #/<project>/~timeline            the timeline by due dates
 // #/<project>/~timeline/<record>   the timeline with that record open in the drawer
+// #/<project>/~map                 the map
+// #/<project>/~map/<record>        the map with that record open in the drawer
 // #/<project>/~journal          the journal
 // The view is part of the address, so a reload brings back the same screen. / Вид входит в адрес: после перезагрузки тот же экран.
 
 /** The views that open a record in a drawer and name it in the address after the view. / Виды, которые открывают запись в панели и называют её в адресе после вида. */
-const DRAWER_VIEWS = ['board', 'timeline'] as const;
+const DRAWER_VIEWS = ['board', 'timeline', 'map'] as const;
 
 function readHash(): { project: string; record: string | null; view: View } {
     const [project = '', rest = '', third = ''] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
@@ -73,7 +75,7 @@ function writeHash(): void {
     const tail =
         state.view === 'journal'
             ? '/~journal'
-            : state.view === 'board' || state.view === 'timeline'
+            : state.view === 'board' || state.view === 'timeline' || state.view === 'map'
               ? `/~${state.view}${state.selected ? `/${state.selected}` : ''}`
               : state.selected
                 ? `/${state.selected}`
@@ -273,6 +275,13 @@ export async function outdent(id: string): Promise<void> {
 // ───────────────────────────── live / вживую ─────────────────────────────
 
 let source: EventSource | null = null;
+const mapListeners = new Set<(project: string) => void>();
+
+/** `fn` is called when the map file of a project changed on disk (by another tab, say). Returns the way to stop. / Зовётся, когда файл карты проекта изменился на диске (например, из другой вкладки). */
+export function onMapChanged(fn: (project: string) => void): () => void {
+    mapListeners.add(fn);
+    return () => mapListeners.delete(fn);
+}
 let pending: ReturnType<typeof setTimeout> | null = null;
 
 function listen(): void {
@@ -280,8 +289,11 @@ function listen(): void {
     source = new EventSource('/api/events');
     source.onmessage = (event) => {
         let projects: string[] = [];
+        let maps: string[] = [];
         try {
-            projects = (JSON.parse(event.data as string) as { projects?: string[] }).projects ?? [];
+            const data = JSON.parse(event.data as string) as { projects?: string[]; maps?: string[] };
+            projects = data.projects ?? [];
+            maps = data.maps ?? [];
         } catch {
             return;
         }
@@ -289,6 +301,9 @@ function listen(): void {
         if (pending) clearTimeout(pending);
         pending = setTimeout(() => {
             pending = null;
+            // a change of `map.json` alone does not make the page take the project again: only the map hears of it
+            if (maps.includes(state.projectId)) for (const fn of mapListeners) fn(state.projectId);
+            if (projects.length === 0) return;
             void loadProjects();
             if (projects.includes(state.projectId)) void refresh();
         }, 80);

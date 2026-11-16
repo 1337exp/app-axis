@@ -114,6 +114,9 @@ describe('saved filter of the board', () => {
     it('starts with tasks and questions, the whole project', () => {
         expect(readFilter('board', 'p', fake())).toEqual({ types: ['task', 'question'], root: null });
         expect(defaultFilter()).toEqual({ types: ['task', 'question'], root: null });
+        // the map is the whole picture: every type is on until the person turns one off
+        expect(defaultFilter('map')).toEqual({ types: ['task', 'idea', 'decision', 'question'], root: null });
+        expect(readFilter('map', 'fresh', { getItem: () => null, setItem: () => undefined })).toEqual(defaultFilter('map'));
     });
 
     it('keeps a filter per project', () => {

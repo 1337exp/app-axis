@@ -15,7 +15,7 @@ import type { RecordType } from '@/core/model';
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
 /** The views that have a filter. / Виды, у которых есть фильтр. */
-export type ViewScope = 'board' | 'timeline';
+export type ViewScope = 'board' | 'timeline' | 'map';
 
 export interface SavedFilter {
     types: RecordType[];
@@ -26,19 +26,19 @@ export interface SavedFilter {
 const key = (scope: ViewScope, projectId: string): string => `axis.${scope}.${projectId}`;
 
 /** The filter by default. / Фильтр по умолчанию. */
-export const defaultFilter = (): SavedFilter => ({ types: [...DEFAULT_FILTER_TYPES], root: null });
+export const defaultFilter = (scope?: ViewScope): SavedFilter => ({ types: [...(scope === 'map' ? FILTER_TYPES : DEFAULT_FILTER_TYPES)], root: null });
 
 /** What was saved for the view in the project, made valid; the default when there is nothing or it is broken. / Сохранённое для вида в проекте, приведённое к верному; умолчание, если ничего нет или оно испорчено. */
 export function readFilter(scope: ViewScope, projectId: string, store?: Store): SavedFilter {
     try {
         const raw = (store ?? localStorage).getItem(key(scope, projectId));
-        if (!raw) return defaultFilter();
+        if (!raw) return defaultFilter(scope);
         const data = JSON.parse(raw) as { types?: unknown; root?: unknown } | null;
-        if (typeof data !== 'object' || data === null || !Array.isArray(data.types)) return defaultFilter();
+        if (typeof data !== 'object' || data === null || !Array.isArray(data.types)) return defaultFilter(scope);
         const types = FILTER_TYPES.filter((type) => (data.types as unknown[]).includes(type));
         return { types: [...types], root: isId(data.root) ? data.root : null };
     } catch {
-        return defaultFilter();
+        return defaultFilter(scope);
     }
 }
 

@@ -4,6 +4,7 @@
  */
 import type { JournalEntry } from '@/core/journal';
 import type { Doc } from '@1337exp/taoeditor/core';
+import type { MapData, MapPatch } from '@/core/map';
 import type { AxisDraft, AxisProject, AxisRecord, ProjectSummary } from '@/core/model';
 
 export class ApiError extends Error {
@@ -58,6 +59,9 @@ export const api = {
     updateRecord: (project: string, id: string, patch: RecordPatch) =>
         call<{ record: AxisRecord }>('PATCH', `projects/${enc(project)}/records/${enc(id)}`, patch).then((r) => r.record),
     deleteRecord: (project: string, id: string) => call<{ deleted: string[] }>('DELETE', `projects/${enc(project)}/records/${enc(id)}`).then((r) => r.deleted),
+    map: (project: string) => call<{ map: MapData }>('GET', `projects/${enc(project)}/map`).then((r) => r.map),
+    /** Where the cards sit and the camera; `keepalive` lets the last move reach the server as the page closes. / Где стоят карточки и камера; `keepalive` даёт последнему переносу дойти при закрытии страницы. */
+    patchMap: (project: string, patch: MapPatch, keepalive = false) => call<{ map: MapData }>('PATCH', `projects/${enc(project)}/map`, patch, { keepalive }).then((r) => r.map),
     journal: (project: string, record?: string) =>
         call<{ journal: JournalEntry[] }>('GET', `projects/${enc(project)}/journal?limit=300${record ? `&record=${enc(record)}` : ''}`).then((r) => r.journal),
     log: (project: string, text: string, record?: string) =>

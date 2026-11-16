@@ -15,6 +15,7 @@ import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
 import BoardPane from '@/ui/BoardPane.vue';
 import JournalPane from '@/ui/JournalPane.vue';
+import MapPane from '@/ui/MapPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
 import RecordPane from '@/ui/RecordPane.vue';
 import StatusBar from '@/ui/StatusBar.vue';
@@ -65,6 +66,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
                 <TaoSegmentedOption value="tree" icon="tree" :label="t('view.tree')" />
                 <TaoSegmentedOption value="board" icon="board" :label="t('view.board')" />
                 <TaoSegmentedOption value="timeline" icon="timeline" :label="t('view.timeline')" />
+                <TaoSegmentedOption value="map" icon="map" :label="t('view.map')" />
                 <TaoSegmentedOption value="journal" icon="journal" :label="t('view.journal')" />
             </TaoSegmented>
             <TaoSelect v-model="locale" class="bar__locale" :options="localeOptions" :clearable="false" :aria-label="t('app.language')" />
@@ -87,6 +89,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
             <div v-else-if="state.view === 'journal'" class="app__scroll"><JournalPane /></div>
             <BoardPane v-else-if="state.view === 'board'" />
             <TimelinePane v-else-if="state.view === 'timeline'" />
+            <MapPane v-else-if="state.view === 'map'" />
 
             <TaoSplit v-else v-model="split" class="app__split" :min="22" :max="70">
                 <template #start><TreePane /></template>
