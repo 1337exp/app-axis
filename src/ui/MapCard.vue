@@ -29,6 +29,8 @@ const props = defineProps<{
     w: number;
     selected: boolean;
     draft: boolean;
+    /** The quick search does not find this card: it stays where it is, dimmed. / Быстрый поиск эту карточку не нашёл: она остаётся на месте, приглушённая. */
+    dim?: boolean;
     /** The progress of an area's branch. / Прогресс ветки раздела. */
     progress: { done: number; total: number; share: number; active: number } | null;
 }>();
@@ -62,6 +64,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
             'mcard--closed': record.status === 'done' || record.status === 'dropped',
             'mcard--dropped': record.status === 'dropped',
             'mcard--active': record.type !== 'area' && record.status === 'active',
+            'mcard--dim': dim,
         }"
         :style="{ transform: `translate(${x}px, ${y}px)`, width: `${w}px`, '--edge': hasStatus(record.type) && record.status !== 'open' ? statusVar(record.status) : 'transparent' }"
         :data-node-id="record.id"
@@ -233,6 +236,10 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
     width: 3px;
     border-radius: var(--tao-radius-panel) 0 0 var(--tao-radius-panel);
     background: var(--edge, transparent);
+}
+
+.mcard--dim {
+    opacity: 0.28;
 }
 
 .mcard--active {

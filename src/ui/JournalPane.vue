@@ -4,12 +4,15 @@
  * Журнал всего проекта: каждое изменение и каждая свободная заметка, новые сверху, и поле для заметки.
  */
 import { TaoButton, TaoEmpty, TaoTextarea, toast } from '@1337exp/taoui';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { api } from '@/app/api';
+import { query, searching } from '@/app/search';
 import { state } from '@/app/state';
 import type { JournalEntry } from '@/core/journal';
 import { useI18n } from '@/i18n';
+import { fold } from '@/core/search';
 import JournalList from './JournalList.vue';
+import SearchEmpty from './SearchEmpty.vue';
 
 const { t } = useI18n();
 const entries = ref<JournalEntry[]>([]);
@@ -25,6 +28,17 @@ async function load(): Promise<void> {
     }
 }
 watch(() => [state.projectId, state.tick], load, { immediate: true });
+
+// the quick search: the title of the record and the text of the entry (a note or the reason) / быстрый поиск: заголовок записи и текст строки (заметка или причина)
+const shown = computed(() => {
+    if (!searching.value) return entries.value;
+    const words = query.value.words;
+    return entries.value.filter((entry) => {
+        const hay = fold(`${entry.title}
+${entry.text ?? ''}`);
+        return words.every((word) => hay.includes(word));
+    });
+});
 
 async function add(): Promise<void> {
     const text = note.value.trim();
@@ -49,7 +63,8 @@ async function add(): Promise<void> {
             <TaoButton type="submit" variant="secondary" :disabled="note.trim() === ''" :loading="busy">{{ t('journal.add') }}</TaoButton>
         </form>
         <TaoEmpty v-if="entries.length === 0" :title="t('journal.empty')">{{ t('journal.emptyText') }}</TaoEmpty>
-        <JournalList v-else :entries="entries" />
+        <SearchEmpty v-else-if="shown.length === 0" />
+        <JournalList v-else :entries="shown" />
     </section>
 </template>
 

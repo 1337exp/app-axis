@@ -18,6 +18,7 @@ import JournalPane from '@/ui/JournalPane.vue';
 import MapPane from '@/ui/MapPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
 import RecordPane from '@/ui/RecordPane.vue';
+import SearchField from '@/ui/SearchField.vue';
 import StatusBar from '@/ui/StatusBar.vue';
 import TimelinePane from '@/ui/TimelinePane.vue';
 import TreePane from '@/ui/TreePane.vue';
@@ -59,6 +60,8 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
             <strong class="bar__name">Axis</strong>
             <TaoSelect v-if="state.projects.length > 0" v-model="projectId" class="bar__project" :options="projectOptions" :clearable="false" :aria-label="t('project.choose')" />
             <TaoButton variant="ghost" tone="neutral" icon="tao-plus" :aria-label="t('project.create')" :title="t('project.create')" @click="creating = true" />
+
+            <SearchField v-if="state.project" class="bar__search" />
 
             <span class="bar__space"></span>
 

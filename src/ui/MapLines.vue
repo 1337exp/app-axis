@@ -16,6 +16,8 @@ import type { LinkKind } from '@/core/model';
 export interface TreeLine {
     id: string;
     d: string;
+    /** An end is a card the search did not find. / Один из концов карточка, которую поиск не нашёл. */
+    dim?: boolean;
 }
 
 export interface TypedLine {
@@ -25,6 +27,7 @@ export interface TypedLine {
     kind: LinkKind;
     label: string;
     mid: { x: number; y: number };
+    dim?: boolean;
 }
 
 export interface Guide {
@@ -47,14 +50,14 @@ defineProps<{
 <template>
     <svg class="mlines" width="1" height="1" aria-hidden="true">
         <g class="mlines__tree">
-            <path v-for="line in tree" :key="line.id" :d="line.d" />
+            <path v-for="line in tree" :key="line.id" :d="line.d" :class="{ 'mlines__dim': line.dim }" />
         </g>
 
         <g v-for="line in guides" :key="`${line.axis}${line.at}`" class="mlines__guide">
             <path :d="line.axis === 'x' ? `M${line.at} ${line.from}V${line.to}` : `M${line.from} ${line.at}H${line.to}`" />
         </g>
 
-        <g v-for="line in links" :key="line.id" class="mlink" :class="[`mlink--${line.kind}`, { 'mlink--selected': selectedId === line.id }]" :data-conn-id="line.id">
+        <g v-for="line in links" :key="line.id" class="mlink" :class="[`mlink--${line.kind}`, { 'mlink--selected': selectedId === line.id, 'mlines__dim': line.dim }]" :data-conn-id="line.id">
             <path class="mlink__line" :d="line.d" />
             <path class="mlink__head" :d="line.head" />
             <path class="mlink__hit" :d="line.d" />
@@ -87,6 +90,10 @@ defineProps<{
 .mlines__tree path {
     stroke: var(--tao-color-border-strong);
     stroke-width: 1;
+}
+
+.mlines .mlines__dim {
+    opacity: 0.2;
 }
 
 .mlines__guide path {

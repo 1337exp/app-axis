@@ -37,6 +37,15 @@ const en: typeof ru = {
         tidied: 'Cards laid out again',
         putBack: '{0}: the place is automatic again',
     },
+    search: {
+        label: 'Quick search',
+        placeholder: 'Search: words, "? question", "idea: …"',
+        clear: 'Clear the search',
+        open: 'Search',
+        found: { one: '{0} found', few: '{0} found', many: '{0} found', other: '{0} found' },
+        none: 'Nothing found',
+        noneText: 'The search looks in the titles and the text of records. A mark at the start (? question, ! decision, * idea, - task, ~ note) looks for that type only.',
+    },
     view: {
         label: 'View',
         tree: 'Tree',

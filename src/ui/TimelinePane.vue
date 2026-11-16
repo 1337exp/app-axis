@@ -14,6 +14,7 @@
  */
 import { TaoButton, TaoEmpty, TaoIcon } from '@1337exp/taoui';
 import { computed, ref, watch } from 'vue';
+import { isFound, searching } from '@/app/search';
 import { hasDraft, select, state } from '@/app/state';
 import { useToday } from '@/app/today';
 import { readFlag, writeFlag } from '@/app/viewFilter';
@@ -24,6 +25,7 @@ import { current, useI18n } from '@/i18n';
 import FilterBar from './FilterBar.vue';
 import { formatMonth } from './format';
 import RecordDrawer from './RecordDrawer.vue';
+import SearchEmpty from './SearchEmpty.vue';
 import TimelineRow from './TimelineRow.vue';
 import { useViewFilter } from './useViewFilter';
 
@@ -48,7 +50,12 @@ watch(noDateOpen, (on) => writeFlag('timeline.nodate', state.projectId, on));
 
 const today = useToday();
 
-const sections = computed(() => buildTimeline(state.records, { types: filter.types, root: rootId.value, showDone: showDone.value }, today.value));
+// the quick search keeps the rows that match; a section left with none goes, and the counts follow / быстрый поиск оставляет подходящие строки; секция без строк уходит, счётчики идут следом
+const sections = computed(() =>
+    buildTimeline(state.records, { types: filter.types, root: rootId.value, showDone: showDone.value }, today.value)
+        .map((section) => ({ ...section, items: section.items.filter((item) => isFound(item.record.id)) }))
+        .filter((section) => section.items.length > 0),
+);
 
 function titleOf(section: TimelineSection): string {
     if (section.kind === 'month') return formatMonth(section.month ?? '', current.value);
@@ -66,7 +73,8 @@ const isOpen = (section: TimelineSection): boolean => section.kind !== 'none' ||
         </FilterBar>
 
         <div class="timeline__scroll">
-            <TaoEmpty v-if="sections.length === 0" class="timeline__empty" :title="t('timeline.empty')">{{ t('timeline.emptyText') }}</TaoEmpty>
+            <SearchEmpty v-if="sections.length === 0 && searching" class="timeline__empty" />
+            <TaoEmpty v-else-if="sections.length === 0" class="timeline__empty" :title="t('timeline.empty')">{{ t('timeline.emptyText') }}</TaoEmpty>
 
             <div v-else class="timeline">
                 <section v-for="section in sections" :key="section.id" class="tsec" :class="`tsec--${section.kind}`" :aria-labelledby="`tsec-${section.id}`">

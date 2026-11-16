@@ -449,6 +449,8 @@ export interface Curve {
     head: string;
     /** The middle of the line: where a label sits. / Середина линии: там стоит подпись. */
     mid: MapPoint;
+    /** The point of the line at `t` from 0 to 1. / Точка линии при `t` от 0 до 1. */
+    at: (t: number) => MapPoint;
 }
 
 const n1 = (n: number): string => String(Math.round(n * 10) / 10);
@@ -478,7 +480,30 @@ export function curve(a: Anchor, b: Anchor | MapPoint, head = 0): Curve {
         const w = head * 0.45;
         arrow = `M${n1(tip.x)} ${n1(tip.y)}L${n1(base.x + nx * w)} ${n1(base.y + ny * w)}L${n1(base.x - nx * w)} ${n1(base.y - ny * w)}Z`;
     }
-    return { d, head: arrow, mid };
+    const at = (t: number): MapPoint => {
+        const u = 1 - t;
+        return {
+            x: u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * end.x,
+            y: u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * end.y,
+        };
+    };
+    return { d, head: arrow, mid, at };
+}
+
+/**
+ * Where a label of `w` x `h` units sits on a line: the middle if no card is under it, else the nearest free part of the line
+ * (steps from the middle outwards); the middle again when the whole line is covered.
+ * Где стоит подпись `w` на `h` единиц на линии: посередине, если под ней нет карточки, иначе ближайшее свободное место
+ * линии (шаги от середины наружу); снова середина, если закрыта вся линия.
+ */
+export function labelSpot(line: Curve, cards: Iterable<Rect>, w: number, h: number): MapPoint {
+    const list = [...cards];
+    const free = (p: MapPoint): boolean => !list.some((r) => p.x + w / 2 > r.x && p.x - w / 2 < r.x + r.w && p.y + h / 2 > r.y && p.y - h / 2 < r.y + r.h);
+    for (const t of [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) {
+        const p = line.at(t);
+        if (free(p)) return p;
+    }
+    return line.mid;
 }
 
 const ROUND = 10;

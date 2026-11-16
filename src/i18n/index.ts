@@ -18,7 +18,7 @@ const i18n = createI18n<typeof LOCALES, MessageKey>({ locales: LOCALES, fallback
 export const { setLocale, translate, useI18n, current, codes } = i18n;
 
 /** Keys of the counted phrases: each is a group of `one`, `few`, `many`, `other` in the dictionaries. / Ключи фраз со счётом: каждый это группа `one`, `few`, `many`, `other` в словарях. */
-export type PluralKey = 'timeline.inDays' | 'timeline.lateDays';
+export type PluralKey = 'timeline.inDays' | 'timeline.lateDays' | 'search.found';
 
 /**
  * A counted phrase in the language at hand, in the right form: `plural('ru', 'timeline.inDays', 2)` is "через 2 дня".

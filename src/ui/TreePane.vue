@@ -9,15 +9,18 @@
 import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoTree, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
+import { isFound, kept, query } from '@/app/search';
 import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
+import { markRanges } from '@/core/search';
 import { progressOf, shares } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { current, useI18n } from '@/i18n';
 import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
 import { isOverdue } from './marks';
+import SearchEmpty from './SearchEmpty.vue';
 import StatusMark from './StatusMark.vue';
 import TypeSelect from './TypeSelect.vue';
 
@@ -37,9 +40,54 @@ const nodeById = computed(() => {
     return map;
 });
 
+/** With a quick search typed only the found records and their ancestors stay. / При наборе быстрого поиска остаются только найденные записи и их предки. */
 const toTao = (nodes: readonly TreeNode[]): TaoTreeNode[] =>
-    nodes.map((node) => ({ id: node.record.id, label: node.record.title, ...(node.children.length > 0 ? { children: toTao(node.children) } : {}) }));
+    nodes
+        .filter((node) => !kept.value || kept.value.has(node.record.id))
+        .map((node) => {
+            const children = toTao(node.children);
+            return { id: node.record.id, label: node.record.title, ...(children.length > 0 ? { children } : {}) };
+        });
 const nodes = computed(() => toTao(tree.value));
+
+/**
+ * While a search is typed every branch that is left is open; the person's own open and closed branches are not touched and come
+ * back when the line is cleared.
+ * Пока набран поиск, каждая оставшаяся ветка раскрыта; собственные открытые и закрытые ветки человека не трогаются и
+ * возвращаются, когда строка очищена.
+ */
+const shownExpanded = computed({
+    get: () => {
+        if (!kept.value) return expanded.value;
+        const ids: string[] = [];
+        const walk = (list: readonly TaoTreeNode[]): void => {
+            for (const n of list) {
+                if (n.children?.length) ids.push(n.id);
+                walk(n.children ?? []);
+            }
+        };
+        walk(nodes.value);
+        return ids;
+    },
+    set: (value: string[]) => {
+        if (!kept.value) expanded.value = value;
+    },
+});
+
+/** A title cut into plain and found pieces for the highlight. / Заголовок, разрезанный на обычные и найденные куски для подсветки. */
+function pieces(title: string): { text: string; hit: boolean }[] {
+    const ranges = kept.value ? markRanges(title, query.value.words) : [];
+    if (ranges.length === 0) return [{ text: title, hit: false }];
+    const out: { text: string; hit: boolean }[] = [];
+    let at = 0;
+    for (const [from, to] of ranges) {
+        if (from > at) out.push({ text: title.slice(at, from), hit: false });
+        out.push({ text: title.slice(from, to), hit: true });
+        at = to;
+    }
+    if (at < title.length) out.push({ text: title.slice(at), hit: false });
+    return out;
+}
 
 // every branch starts open; after that the user decides, and a branch that gets a child opens
 const expanded = ref<string[]>([]);
@@ -155,8 +203,9 @@ async function add(): Promise<void> {
 <template>
     <section class="tree-pane">
         <div class="tree-pane__scroll">
-            <TaoEmpty v-if="nodes.length === 0" :title="t('tree.empty')">{{ t('tree.emptyText') }}</TaoEmpty>
-            <TaoTree v-else v-model:expanded="expanded" v-model:selected="selected" :nodes="nodes" :aria-label="t('tree.label')">
+            <SearchEmpty v-if="nodes.length === 0 && kept" />
+            <TaoEmpty v-else-if="nodes.length === 0" :title="t('tree.empty')">{{ t('tree.emptyText') }}</TaoEmpty>
+            <TaoTree v-else v-model:expanded="shownExpanded" v-model:selected="selected" :nodes="nodes" :aria-label="t('tree.label')">
                 <template #icon="{ node }">
                     <template v-for="r in [row(node.id)]" :key="node.id">
                         <StatusMark v-if="r" :record="r.record" :tabbable="false" />
@@ -164,8 +213,8 @@ async function add(): Promise<void> {
                 </template>
                 <template #label="{ node }">
                     <template v-for="r in [row(node.id)]" :key="node.id">
-                        <span v-if="r" class="row" :class="{ 'row--closed': r.record.status === 'done' || r.record.status === 'dropped', 'row--dropped': r.record.status === 'dropped', 'row--area': r.record.type === 'area' }">
-                            <span class="row__title">{{ r.record.title }}</span>
+                        <span v-if="r" class="row" :class="{ 'row--closed': r.record.status === 'done' || r.record.status === 'dropped', 'row--dropped': r.record.status === 'dropped', 'row--area': r.record.type === 'area', 'row--dim': kept !== null && !isFound(r.record.id) }">
+                            <span class="row__title"><template v-for="(piece, i) in pieces(r.record.title)" :key="i"><mark v-if="piece.hit" class="row__hit">{{ piece.text }}</mark><template v-else>{{ piece.text }}</template></template></span>
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
                             <TaoIcon v-if="hasDraft(r.record.id)" class="row__mark row__draft" name="tao-edit" :title="t('tree.hasDraft')" />
                             <TaoIcon v-if="r.record.images.length > 0" class="row__mark" name="image" />
@@ -234,6 +283,17 @@ async function add(): Promise<void> {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.row--dim {
+    opacity: 0.5;
+}
+
+/* the found part of a title: a quiet background, no loud yellow / найденная часть заголовка: тихий фон, без кричащей жёлтой заливки */
+.row__hit {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--tao-color-text) 18%, transparent);
+    color: inherit;
 }
 
 .row--area .row__title {

@@ -12,6 +12,7 @@
  */
 import { TaoEmpty } from '@1337exp/taoui';
 import { computed, ref } from 'vue';
+import { isFound, searching } from '@/app/search';
 import { hasDraft, select, state } from '@/app/state';
 import { groupByStatus } from '@/core/board';
 import type { AxisRecord, Status } from '@/core/model';
@@ -20,6 +21,7 @@ import { useI18n } from '@/i18n';
 import BoardCard from './BoardCard.vue';
 import FilterBar from './FilterBar.vue';
 import RecordDrawer from './RecordDrawer.vue';
+import SearchEmpty from './SearchEmpty.vue';
 import { changeStatus } from './undoable';
 import { useViewFilter } from './useViewFilter';
 
@@ -30,7 +32,10 @@ const { filter, root, rootId, areaOptions, typeOn, setType } = useViewFilter('bo
 
 // ───────────────────────────── the columns / колонки ─────────────────────────────
 
-const columns = computed(() => groupByStatus(state.records, { types: filter.types, root: rootId.value }));
+// the quick search keeps the cards that match; the counts of the columns follow / быстрый поиск оставляет подходящие карточки; счётчики колонок идут следом
+const columns = computed(() =>
+    groupByStatus(state.records, { types: filter.types, root: rootId.value }).map((column) => ({ ...column, records: column.records.filter((r) => isFound(r.id)) })),
+);
 const total = computed(() => columns.value.reduce((sum, column) => sum + column.records.length, 0));
 
 const setStatus = (record: AxisRecord, status: Status): Promise<void> => changeStatus(record, status);
@@ -78,7 +83,8 @@ function onDrop(status: Status, event: DragEvent): void {
     <section class="board-pane" :aria-label="t('board.label')">
         <FilterBar v-model:root="root" :type-on="typeOn" :area-options="areaOptions" @type="setType" />
 
-        <TaoEmpty v-if="total === 0" class="board-empty" :title="t('board.empty')">{{ t('board.emptyText') }}</TaoEmpty>
+        <SearchEmpty v-if="total === 0 && searching" class="board-empty" />
+        <TaoEmpty v-else-if="total === 0" class="board-empty" :title="t('board.empty')">{{ t('board.emptyText') }}</TaoEmpty>
 
         <div v-else class="board">
             <section
@@ -212,32 +218,45 @@ function onDrop(status: Status, event: DragEvent): void {
  */
 .column--open {
     --column: var(--axis-status-open);
-    --column-soft: color-mix(in srgb, var(--tao-color-text-muted) 7%, transparent);
 }
 
 .column--active {
     --column: var(--axis-status-active);
-    --column-soft: var(--axis-status-active-soft);
 }
 
 .column--done {
     --column: var(--axis-status-done);
-    --column-soft: var(--axis-status-done-soft);
 }
 
 .column--dropped {
     /* the quietest of the four: the border is the danger colour mixed halfway into the surface / самая тихая из четырёх: граница это цвет опасности, наполовину смешанный с поверхностью */
     --column: color-mix(in srgb, var(--axis-status-dropped) 55%, var(--tao-color-surface));
-    --column-soft: var(--axis-status-dropped-soft);
 }
 
 .column {
+    /*
+     * The whole column is one tint of its status, the way a group is tinted in the workspace: a faint body, a header strip a little
+     * stronger, a thin top border in the full colour; the cards stay on the plain surface and stand out. The two strengths are the
+     * knobs (the share of the status colour mixed into the column surface; the same share is a pale tint in the light theme).
+     * Вся колонка одного тона своего статуса, как в workspace тонируется группа: слабое тело, чуть более сильная полоса шапки,
+     * тонкая верхняя граница полным цветом; карточки остаются на обычной поверхности и выделяются. Две силы это ручки
+     * (доля цвета статуса в поверхности колонки; в светлой теме та же доля даёт бледный тон).
+     */
+    --axis-column-tint: 7%;
+    --axis-column-head-tint: 17%;
     border-top: 3px solid var(--column);
+    background: color-mix(in srgb, var(--column) var(--axis-column-tint), var(--tao-color-surface-sunken));
 }
 
 .column__head {
-    background: var(--column-soft);
+    background: color-mix(in srgb, var(--column) var(--axis-column-head-tint), var(--tao-color-surface-sunken));
     border-radius: var(--tao-radius-lg) var(--tao-radius-lg) 0 0;
+}
+
+/* not started stays neutral: no tint on the body, the head only a shade darker / «не начато» остаётся нейтральной: тела без тона, шапка лишь чуть темнее */
+.column--open {
+    --axis-column-tint: 0%;
+    --axis-column-head-tint: 8%;
 }
 
 /* dropped: the quietest column / отброшено: самая тихая колонка */

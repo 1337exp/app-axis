@@ -16,7 +16,8 @@ import type { AxisRecord, Status } from '@/core/model';
 import { current, useI18n } from '@/i18n';
 import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
-import { isOverdue, statusKeyOf, statusVar, toneClass, typeIcon } from './marks';
+import { isOverdue, statusKeyOf, statusVar } from './marks';
+import StatusMark from './StatusMark.vue';
 
 const props = defineProps<{
     record: AxisRecord;
@@ -54,7 +55,7 @@ const onSelect = (id: string): void => {
 
 <template>
     <li class="card" :class="{ 'card--dragging': dragging }" draggable="true" @dragstart="emit('dragstart', $event)" @dragend="emit('dragend', $event)">
-        <span class="card__type" :class="toneClass(record)" :title="t(`type.${record.type}`)"><TaoIcon :name="typeIcon(record.type)" /></span>
+        <StatusMark class="card__type" :record="record" />
         <button type="button" class="card__title" @click="emit('open')">{{ record.title }}</button>
         <TaoDropdownMenu class="card__menu" :items="items" :menu-label="t('board.cardActions')" size="small" dots="horizontal" @select="onSelect">
             <template #item="{ id, label }">
@@ -95,11 +96,11 @@ const onSelect = (id: string): void => {
     opacity: 0.45;
 }
 
+/* the mark is a button for a task (a click moves the status): above the stretched box of the title, like the menu / отметка это кнопка у задачи (клик двигает статус): над растянутой областью заголовка, как и меню */
 .card__type {
-    display: inline-flex;
-    align-items: center;
+    position: relative;
+    z-index: 1;
     height: 1.4em;
-    font-size: 16px;
 }
 
 /* the title is the button that opens the record; its box is stretched over the whole card, the menu stays above it */

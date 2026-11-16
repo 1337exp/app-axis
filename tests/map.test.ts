@@ -8,6 +8,7 @@ import {
     emptyMap,
     estimateHeight,
     joinSides,
+    labelSpot,
     mergePlaces,
     neighbour,
     normalizeMap,
@@ -290,6 +291,34 @@ describe('lines', () => {
         expect(line.mid.x).toBeLessThan(300);
         expect(curve(from, to).head).toBe('');
         expect(curve(from, { x: 400, y: 300 }).d).toContain('400');
+    });
+});
+
+describe('the place of a label on a line', () => {
+    const { from, to } = joinSides({ x: 0, y: 0, w: 200, h: 80 }, { x: 600, y: 0, w: 200, h: 80 });
+    const line = curve(from, to, 10);
+
+    it('the curve gives its points: the ends and the middle', () => {
+        expect(line.at(0)).toEqual({ x: 200, y: 40 });
+        expect(line.at(0.5).x).toBeCloseTo(line.mid.x);
+        expect(line.at(0.5).y).toBeCloseTo(line.mid.y);
+    });
+
+    it('stays in the middle when nothing covers it', () => {
+        expect(labelSpot(line, [], 60, 16)).toEqual(line.at(0.5));
+    });
+
+    it('moves along the line off a card that covers the middle', () => {
+        const mid = line.mid;
+        const card = { x: mid.x - 80, y: mid.y - 40, w: 160, h: 80 };
+        const spot = labelSpot(line, [card], 60, 16);
+        expect(spot).not.toEqual(line.at(0.5));
+        const inside = spot.x + 30 > card.x && spot.x - 30 < card.x + card.w && spot.y + 8 > card.y && spot.y - 8 < card.y + card.h;
+        expect(inside).toBe(false);
+    });
+
+    it('falls back to the middle when the whole line is covered', () => {
+        expect(labelSpot(line, [{ x: -1000, y: -1000, w: 4000, h: 4000 }], 60, 16)).toEqual(line.mid);
     });
 });
 

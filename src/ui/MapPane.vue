@@ -22,6 +22,7 @@ import { TaoxCanvas } from '@1337exp/taoux/canvas';
 import type { CanvasHost, CanvasOptions } from '@1337exp/taoux/canvas';
 import { snapToGuides } from '@1337exp/taoux/guides';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue';
+import { isFound, found, search } from '@/app/search';
 import { addRecord, hasDraft, recordById, select, state, tree } from '@/app/state';
 import { flushMap, holdMap, loadMap, mapState, placeCards, saveCamera } from '@/app/mapState';
 import { readFlag, writeFlag } from '@/app/viewFilter';
@@ -34,6 +35,7 @@ import {
     drawnParents,
     estimateHeight,
     joinSides,
+    labelSpot,
     mergePlaces,
     neighbour,
     pointOn,
@@ -169,7 +171,7 @@ const treeLineList = computed<TreeLine[]>(() => {
         const a = item.parent ? rects.value.get(item.parent) : undefined;
         const b = rects.value.get(item.id);
         if (!a || !b || !item.parent) continue;
-        out.push({ id: `${item.parent}>${item.id}`, d: treePath(a, b, siblings.get(item.parent) ?? [b]) });
+        out.push({ id: `${item.parent}>${item.id}`, d: treePath(a, b, siblings.get(item.parent) ?? [b]), dim: !isFound(item.id) || !isFound(item.parent) });
     }
     return out;
 });
@@ -185,7 +187,10 @@ const linkLineList = computed<TypedLine[]>(() => {
             if (!a || !b || link.to === record.id) continue;
             const { from, to } = joinSides(a, b);
             const line = curve(from, to, headSize.value);
-            out.push({ id: linkId(record.id, link.to, link.kind), d: line.d, head: line.head, kind: link.kind, label: t(`links.out.${link.kind}`), mid: line.mid });
+            const label = t(`links.out.${link.kind}`);
+            // the label goes on a free part of the line, not over a card (its size in world units follows the zoom) / подпись на свободной части линии, не над карточкой (её размер в мировых единицах следует за масштабом)
+            const mid = labelSpot(line, rects.value.values(), (label.length * 7) / zoom.value, 16 / zoom.value);
+            out.push({ id: linkId(record.id, link.to, link.kind), d: line.d, head: line.head, kind: link.kind, label, mid, dim: !isFound(record.id) || !isFound(link.to) });
         }
     }
     return out;
@@ -421,7 +426,8 @@ interface MenuState {
     run: (id: string) => void;
 }
 const menu = ref<MenuState | null>(null);
-const anchor = ref<HTMLElement | null>(null);
+/** The point the open menu hangs from (window coordinates). / Точка, от которой висит открытое меню (координаты окна). */
+const menuAnchor = computed(() => ({ x: menu.value?.x ?? 0, y: menu.value?.y ?? 0 }));
 
 interface Creating {
     x: number;
@@ -461,7 +467,9 @@ const parentOfNew = computed(() => (creating.value?.parent ? recordById(creating
 
 function openMenu(screen: MapPoint, items: TaoMenuItem[], run: (id: string) => void): void {
     creating.value = null;
-    menu.value = { x: screen.x, y: screen.y, items, run };
+    // TaoMenu takes a point in window coordinates (TaoUI 5.49): the point of the canvas plus the place of the canvas / TaoMenu берёт точку в координатах окна (TaoUI 5.49): точка холста плюс место самого холста
+    const at = canvas.value?.root?.getBoundingClientRect();
+    menu.value = { x: screen.x + (at?.left ?? 0), y: screen.y + (at?.top ?? 0), items, run };
 }
 
 function putBack(id: string): void {
@@ -687,6 +695,17 @@ async function tidy(): Promise<void> {
     fit();
 }
 
+// Enter in the search field: bring the found cards into view (nothing moves, only the camera) / Enter в поле поиска: показать найденные карточки (ничего не двигается, только камера)
+watch(
+    () => search.enter,
+    () => {
+        const ids = found.value;
+        if (!ids || !ready.value) return;
+        const at = boundsOf([...rects.value].filter(([id]) => ids.has(id)).map(([, r]) => r));
+        if (at) setCamera(fitCamera(at, viewport.value, 64, { min: LIMITS.min, max: 1 }));
+    },
+);
+
 // ───────────────────────────── life / жизнь ─────────────────────────────
 
 onMounted(() => {
@@ -726,6 +745,7 @@ onBeforeUnmount(() => {
                     :w="cardWidth(record.type)"
                     :selected="selection.has(record.id)"
                     :draft="hasDraft(record.id)"
+                    :dim="!isFound(record.id)"
                     :progress="areaProgress.get(record.id) ?? null"
                     @size="onSize"
                 />
@@ -755,8 +775,8 @@ onBeforeUnmount(() => {
                         </p>
                     </form>
 
-                    <span ref="anchor" class="map-pane__anchor" aria-hidden="true" :style="{ left: `${menu?.x ?? 0}px`, top: `${menu?.y ?? 0}px` }"></span>
-                    <TaoMenu v-if="menu" :items="menu.items" :open="true" :anchor="anchor" placement="bottom-start" :label="t('map.label')" @select="(id: string) => menu?.run(id)" @close="menu = null" />
+                    <!-- always there, opened by `open`: a menu made already open is never placed / всегда на месте, открывается через `open`: меню, созданное сразу открытым, не получает места -->
+                    <TaoMenu :items="menu?.items ?? []" :open="menu !== null" :anchor="menuAnchor" :label="t('map.label')" @select="(id: string) => menu?.run(id)" @close="menu = null" />
                 </template>
             </TaoxCanvas>
         </div>
@@ -835,12 +855,5 @@ onBeforeUnmount(() => {
 .map-pane__hint strong {
     color: var(--tao-color-text);
     font-weight: 600;
-}
-
-.map-pane__anchor {
-    position: absolute;
-    width: 0;
-    height: 0;
-    pointer-events: none;
 }
 </style>

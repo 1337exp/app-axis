@@ -8,7 +8,8 @@
 import type { JournalEntry } from '../src/core/journal.ts';
 import { hasStatus } from '../src/core/model.ts';
 import type { AxisProject, AxisRecord } from '../src/core/model.ts';
-import { docToText, plainText, preview } from '../src/core/text.ts';
+import { fold, matchesWords } from '../src/core/search.ts';
+import { docToText, preview } from '../src/core/text.ts';
 import { buildTree, pathOf, progressOf, progressOfAll } from '../src/core/tree.ts';
 import type { Progress, TreeNode } from '../src/core/tree.ts';
 
@@ -102,12 +103,9 @@ export function recordText(record: AxisRecord, records: readonly AxisRecord[], j
 
 /** Records that have every word of the query in the title or the text. / Записи, в которых есть все слова запроса. */
 export function search(records: readonly AxisRecord[], query: string): AxisRecord[] {
-    const words = query.toLowerCase().replaceAll('ё', 'е').split(/\s+/).filter(Boolean);
-    if (words.length === 0) return [];
-    return records.filter((record) => {
-        const hay = `${record.title}\n${plainText(record.body)}`.toLowerCase().replaceAll('ё', 'е');
-        return words.every((word) => hay.includes(word));
-    });
+    // the same matching as the quick search of the page (`core/search.ts`); an empty query finds nothing here, not everything
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    return words.length === 0 ? [] : records.filter((record) => matchesWords(record, words));
 }
 
 export const hitText = (project: string, record: AxisRecord): string =>
