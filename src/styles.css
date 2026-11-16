@@ -1,0 +1,15 @@
+/* The page itself: the app fills the window and scrolls inside its panes. / Сама страница: приложение занимает окно и прокручивается внутри панелей. */
+
+html,
+body,
+#app {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    overflow: hidden;
+    background: var(--tao-color-bg);
+    color: var(--tao-color-text);
+    font-family: var(--tao-font-family);
+}

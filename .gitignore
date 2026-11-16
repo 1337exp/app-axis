@@ -1,0 +1,10 @@
+node_modules
+dist
+*.local
+.DS_Store
+.idea
+.claude/*
+
+# the data of the default folder and the local choice of another one
+data
+axis.local.json
