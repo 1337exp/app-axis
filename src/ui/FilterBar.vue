@@ -16,6 +16,8 @@ import { typeIcon } from './marks';
 defineProps<{
     typeOn: (type: RecordType) => boolean;
     areaOptions: { value: string; label: string }[];
+    /** A narrower branch select and tighter gaps, for a view whose toolbar carries more buttons (the map). / Список веток уже и зазоры теснее, для вида, у которого в панели больше кнопок (карта). */
+    compact?: boolean;
 }>();
 
 const root = defineModel<string>('root', { required: true });
@@ -25,7 +27,7 @@ const { t } = useI18n();
 </script>
 
 <template>
-    <div class="filter-bar" role="group" :aria-label="t('filter.label')">
+    <div class="filter-bar" :class="{ 'filter-bar--compact': compact }" role="group" :aria-label="t('filter.label')">
         <div class="filter-bar__types" role="group" :aria-label="t('filter.types')">
             <TaoButton
                 v-for="type in FILTER_TYPES"
@@ -61,6 +63,14 @@ const { t } = useI18n();
     display: flex;
     flex-wrap: wrap;
     gap: var(--tao-space-1);
+}
+
+.filter-bar--compact {
+    gap: var(--tao-space-2);
+}
+
+.filter-bar--compact .filter-bar__branch {
+    width: 170px;
 }
 
 .filter-bar__branch {

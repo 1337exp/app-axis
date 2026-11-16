@@ -39,6 +39,7 @@ import {
     pointOn,
     shiftPlaces,
     sideNear,
+    treePath,
     visibleIds,
 } from '@/core/map';
 import type { Direction, LayoutItem, MapPoint, Rect, Side } from '@/core/map';
@@ -158,12 +159,16 @@ const headSize = computed(() => Math.min(26, Math.max(9, 11 / zoom.value)));
 const treeLineList = computed<TreeLine[]>(() => {
     if (!treeLines.value) return [];
     const out: TreeLine[] = [];
+    const siblings = new Map<string, Rect[]>();
+    for (const item of items.value) {
+        const at = rects.value.get(item.id);
+        if (item.parent && at) siblings.set(item.parent, [...(siblings.get(item.parent) ?? []), at]);
+    }
     for (const item of items.value) {
         const a = item.parent ? rects.value.get(item.parent) : undefined;
         const b = rects.value.get(item.id);
-        if (!a || !b) continue;
-        const { from, to } = joinSides(a, b);
-        out.push({ id: `${item.parent}>${item.id}`, d: curve(from, to).d });
+        if (!a || !b || !item.parent) continue;
+        out.push({ id: `${item.parent}>${item.id}`, d: treePath(a, b, siblings.get(item.parent) ?? [b]) });
     }
     return out;
 });
@@ -221,7 +226,7 @@ function setCamera(next: Camera): void {
 
 const LIMITS = { min: 0.1, max: 2 };
 /** The smallest zoom the map opens at by itself. / Самый мелкий масштаб, с которого карта открывается сама. */
-const READABLE = 0.6;
+const READABLE = 0.5;
 
 function fit(): void {
     setCamera(fitCamera(boundsOf([...rects.value.values()]), viewport.value, 48, { min: LIMITS.min, max: 1 }));
@@ -701,14 +706,10 @@ onBeforeUnmount(() => {
 
 <template>
     <section class="map-pane" :aria-label="t('map.label')">
-        <FilterBar v-model:root="root" :type-on="typeOn" :area-options="areaOptions" @type="setType">
-            <TaoButton v-model:pressed="showDone" variant="ghost" tone="neutral" icon="tao-check-circle">{{ t('map.showDone') }}</TaoButton>
-            <TaoButton v-model:pressed="treeLines" variant="ghost" tone="neutral" icon="tree" :title="t('map.treeLines')">
-                <span class="map-pane__text">{{ t('map.treeLines') }}</span>
-            </TaoButton>
-            <TaoButton variant="ghost" tone="neutral" icon="tidy" :title="t('map.tidy')" @click="tidy">
-                <span class="map-pane__text">{{ t('map.tidy') }}</span>
-            </TaoButton>
+        <FilterBar v-model:root="root" :type-on="typeOn" :area-options="areaOptions" compact @type="setType">
+            <TaoButton v-model:pressed="showDone" variant="ghost" tone="neutral" icon="tao-check-circle" :aria-label="t('map.showDone')" :title="t('map.showDone')" />
+            <TaoButton v-model:pressed="treeLines" variant="ghost" tone="neutral" icon="tree" :aria-label="t('map.treeLines')" :title="t('map.treeLines')" />
+            <TaoButton variant="ghost" tone="neutral" icon="tidy" :aria-label="t('map.tidy')" :title="t('map.tidy')" @click="tidy" />
         </FilterBar>
 
         <div class="map-pane__stage" @keydown="onKeydown" @pointerdown.capture="trackAlt" @dblclick="onDouble">
@@ -838,11 +839,5 @@ onBeforeUnmount(() => {
     width: 0;
     height: 0;
     pointer-events: none;
-}
-
-@media (max-width: 600px) {
-    .map-pane__text {
-        display: none;
-    }
 }
 </style>

@@ -14,6 +14,8 @@ import {
     patchMap,
     shiftPlaces,
     sideNear,
+    treePath,
+    WRAP_AFTER,
     visibleIds,
 } from '../src/core/map.ts';
 import type { LayoutItem, Rect } from '../src/core/map.ts';
@@ -108,6 +110,81 @@ describe('the automatic layout', () => {
         expect(orphan.x).toEqual({ x: 0, y: 0 });
         const cycle = autoLayout([item('a', 'b'), item('b', 'a')]);
         expect(Object.keys(cycle).sort()).toEqual(['a', 'b']);
+    });
+});
+
+describe('the layout in blocks', () => {
+    const W = 224;
+    /** Three areas with `fan` children each, like the real project. */
+    function three(fan: number): LayoutItem[] {
+        const out: LayoutItem[] = [];
+        for (let a = 0; a < 3; a++) {
+            out.push(item(`a${a}`, null, a, 288, 64));
+            for (let i = 0; i < fan; i++) out.push(item(`a${a}-${i}`, `a${a}`, i, W, 56 + ((i * 17) % 3) * 18));
+        }
+        return out;
+    }
+    const box = (items: readonly LayoutItem[], p: Record<string, { x: number; y: number }>) => ({
+        w: Math.max(...items.map((i) => p[i.id]!.x + i.w)) - Math.min(...items.map((i) => p[i.id]!.x)),
+        h: Math.max(...items.map((i) => p[i.id]!.y + i.h)) - Math.min(...items.map((i) => p[i.id]!.y)),
+    });
+
+    it('puts three areas with ten children in a picture near 16:10, not a tall strip', () => {
+        const items = three(10);
+        const p = autoLayout(items);
+        noOverlaps(items, p);
+        const { w, h } = box(items, p);
+        expect(w / h).toBeGreaterThan(1);
+        expect(w / h).toBeLessThan(2.6);
+    });
+
+    it('wraps a long column of children into several, in order top to bottom then left to right', () => {
+        const items = [item('r', null), ...Array.from({ length: 20 }, (_, i) => item(`k${i}`, 'r', i, W, 60))];
+        const p = autoLayout(items);
+        noOverlaps(items, p);
+        const xs = [...new Set(items.slice(1).map((i) => p[i.id]!.x))].sort((a, b) => a - b);
+        expect(xs).toHaveLength(Math.ceil(20 / WRAP_AFTER));
+        expect(p.k0!.x).toBe(xs[0]);
+        expect(p.k6!.x).toBe(xs[0]);
+        expect(p.k7!.x).toBe(xs[1]);
+        expect(p.k1!.y).toBeGreaterThan(p.k0!.y);
+        expect(p.k7!.y).toBe(p.k0!.y);
+        // a parent with few children keeps one column
+        const small = autoLayout([item('r', null), ...Array.from({ length: WRAP_AFTER }, (_, i) => item(`s${i}`, 'r', i))]);
+        expect(new Set(Object.entries(small).filter(([id]) => id !== 'r').map(([, v]) => v.x)).size).toBe(1);
+    });
+
+    it('wraps top-level blocks into rows, never more than five in a row', () => {
+        const items = Array.from({ length: 12 }, (_, i) => item(`t${i}`, null, i, W, 60));
+        const p = autoLayout(items);
+        noOverlaps(items, p);
+        const rows = new Map<number, number>();
+        for (const i of items) rows.set(p[i.id]!.y, (rows.get(p[i.id]!.y) ?? 0) + 1);
+        expect(Math.max(...rows.values())).toBeLessThanOrEqual(5);
+        expect(rows.size).toBeGreaterThan(1);
+        expect(autoLayout(three(10))).toEqual(autoLayout(three(10)));
+    });
+
+    it('gives a child that has its own children room for them when columns wrap', () => {
+        const items: LayoutItem[] = [item('r', null)];
+        for (let i = 0; i < 12; i++) {
+            items.push(item(`k${i}`, 'r', i, W, 60));
+            if (i % 3 === 0) for (let j = 0; j < 3; j++) items.push(item(`k${i}.${j}`, `k${i}`, j, W, 60));
+        }
+        noOverlaps(items, autoLayout(items));
+        noOverlaps(nested(2, 9), autoLayout(nested(2, 9)));
+    });
+
+    it('draws a tree line through the gaps for a child in a later column, and a curve for the first column', () => {
+        const items = [item('r', null), ...Array.from({ length: 12 }, (_, i) => item(`k${i}`, 'r', i, W, 60))];
+        const p = autoLayout(items);
+        const rect = (i: LayoutItem): Rect => ({ x: p[i.id]!.x, y: p[i.id]!.y, w: i.w, h: i.h });
+        const kids = items.slice(1).map(rect);
+        expect(treePath(rect(items[0]!), kids[0]!, kids)).toContain('C');
+        const later = treePath(rect(items[0]!), kids[11]!, kids);
+        expect(later).not.toContain('C');
+        // it runs above the first column, never through a card of it
+        expect(later).toContain(String(Math.round((Math.min(...kids.map((r) => r.y)) - 22) * 10) / 10));
     });
 });
 

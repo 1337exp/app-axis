@@ -94,7 +94,7 @@ export const CARD_W = 224;
 export const AREA_W = 288;
 const GAP_X = 72;
 const GAP_Y = 18;
-const GAP_ROOT = 56;
+const GAP_ROOT = 64;
 
 export const cardWidth = (type: RecordType): number => (type === 'area' ? AREA_W : CARD_W);
 
@@ -198,13 +198,26 @@ export interface LayoutItem {
     h: number;
 }
 
+/** A parent with more children than this wraps them into several columns. / Родитель с большим числом детей раскладывает их в несколько столбцов. */
+export const WRAP_AFTER = 8;
+/** At most this many top-level blocks in a row. / Не больше стольких блоков верхнего уровня в ряду. */
+const ROW_MAX = 5;
+/** The shape the layout aims at: width / height of everything. / Форма, к которой стремится раскладка: ширина / высота всего. */
+const ASPECT = 1.6;
+
 /**
- * A tidy tree growing left to right: the roots at the left, stacked with a gap, the children of a card in a column to
- * the right of it, centred on it; subtrees never overlap. Deterministic: the same input gives the same places.
- * An item whose parent is not in the list is a root.
+ * An automatic layout in blocks. A block is a record with its whole subtree: the children of a card stand in a column
+ * to the right of it, the card centred on them; a parent with more than `WRAP_AFTER` children gets several columns side
+ * by side (top to bottom, then left to right), each column as wide as its widest subtree. The top-level blocks stand in
+ * a row, top-aligned with a gap, and the row wraps into more rows when that brings the whole picture nearer to 16:10
+ * (never more than five blocks in a row). Nothing overlaps; deterministic: the same input gives the same places.
+ * An item whose parent is not in the list is a top-level one.
  *
- * Аккуратное дерево слева направо: корни слева стопкой с зазором, дети карточки столбцом справа от неё и по её центру;
- * поддеревья не перекрываются. Детерминирована: тот же вход даёт те же места. Элемент, чьего родителя нет в списке, корень.
+ * Автоматическая раскладка блоками. Блок это запись со всем её поддеревом: дети карточки стоят столбцом справа, она по их
+ * центру; у родителя, у которого детей больше `WRAP_AFTER`, несколько столбцов рядом (сверху вниз, потом слева направо),
+ * каждый шириной в самое широкое поддерево. Блоки верхнего уровня стоят рядом в ряд, по верхнему краю, с зазором, и ряд
+ * переносится на новые, если так вся картина ближе к 16:10 (не больше пяти блоков в ряду). Ничего не перекрывается;
+ * детерминирована: тот же вход даёт те же места. Элемент, чьего родителя нет в списке, верхнего уровня.
  */
 export function autoLayout(items: readonly LayoutItem[]): Record<string, MapPoint> {
     const byId = new Map(items.map((item) => [item.id, item]));
@@ -215,48 +228,111 @@ export function autoLayout(items: readonly LayoutItem[]): Record<string, MapPoin
         list.push(item);
         kids.set(key, list);
     }
-    for (const list of kids.values()) list.sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const byOrder = (a: LayoutItem, b: LayoutItem): number => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    for (const list of kids.values()) list.sort(byOrder);
+
+    interface Block {
+        w: number;
+        h: number;
+        cols: LayoutItem[][];
+        colW: number[];
+        childrenH: number;
+    }
+    const blocks = new Map<string, Block>();
+    const busy = new Set<string>();
+
+    const measure = (item: LayoutItem): Block => {
+        const cached = blocks.get(item.id);
+        if (cached) return cached;
+        if (busy.has(item.id)) return { w: item.w, h: item.h, cols: [], colW: [], childrenH: 0 }; // a cycle ends here / цикл заканчивается здесь
+        busy.add(item.id);
+        const list = (kids.get(item.id) ?? []).filter((k) => k.id !== item.id && !busy.has(k.id));
+        const count = Math.max(1, Math.ceil(list.length / WRAP_AFTER));
+        const per = Math.ceil(list.length / count);
+        const cols: LayoutItem[][] = [];
+        for (let c = 0; c < count; c++) if (list.length > c * per) cols.push(list.slice(c * per, (c + 1) * per));
+        const colW = cols.map((col) => Math.max(...col.map((k) => measure(k).w)));
+        const colH = cols.map((col) => col.reduce((sum, k, i) => sum + measure(k).h + (i > 0 ? GAP_Y : 0), 0));
+        const childrenH = Math.max(0, ...colH);
+        const childrenW = colW.reduce((sum, w, i) => sum + w + (i > 0 ? GAP_X : 0), 0);
+        const block = { w: item.w + (cols.length > 0 ? GAP_X + childrenW : 0), h: Math.max(item.h, childrenH), cols, colW, childrenH };
+        busy.delete(item.id);
+        blocks.set(item.id, block);
+        return block;
+    };
 
     const out: Record<string, MapPoint> = {};
-    const seen = new Set<string>();
-    const heights = new Map<string, number>();
-
-    // the height of the block of a card: its children stacked, or the card itself if that is taller / высота блока карточки: дети стопкой или она сама, если выше
-    const block = (item: LayoutItem): number => {
-        const cached = heights.get(item.id);
-        if (cached !== undefined) return cached;
-        heights.set(item.id, item.h); // a cycle ends here / цикл заканчивается здесь
-        const list = (kids.get(item.id) ?? []).filter((k) => k.id !== item.id);
-        const total = list.reduce((sum, k, i) => sum + block(k) + (i > 0 ? GAP_Y : 0), 0);
-        const height = Math.max(item.h, total);
-        heights.set(item.id, height);
-        return height;
-    };
-
+    const placed = new Set<string>();
     const place = (item: LayoutItem, x: number, top: number): void => {
-        if (seen.has(item.id)) return;
-        seen.add(item.id);
-        const height = block(item);
-        out[item.id] = { x, y: top + (height - item.h) / 2 };
-        const list = (kids.get(item.id) ?? []).filter((k) => !seen.has(k.id));
-        const total = list.reduce((sum, k, i) => sum + block(k) + (i > 0 ? GAP_Y : 0), 0);
-        let y = top + (height - total) / 2;
-        for (const child of list) {
-            place(child, x + item.w + GAP_X, y);
-            y += block(child) + GAP_Y;
-        }
+        if (placed.has(item.id)) return;
+        placed.add(item.id);
+        const block = measure(item);
+        out[item.id] = { x, y: top + (block.h - item.h) / 2 };
+        let colX = x + item.w + GAP_X;
+        const y0 = top + (block.h - block.childrenH) / 2;
+        block.cols.forEach((col, c) => {
+            let y = y0;
+            for (const child of col) {
+                if (placed.has(child.id)) continue;
+                place(child, colX, y);
+                y += measure(child).h + GAP_Y;
+            }
+            colX += (block.colW[c] ?? 0) + GAP_X;
+        });
     };
 
-    let top = 0;
-    for (const root of kids.get(null) ?? []) {
-        place(root, 0, top);
-        top += block(root) + GAP_ROOT;
+    // the top-level blocks; what a cycle cut off from every one of them is a block of its own / блоки верхнего уровня; то, что цикл отрезал от всех, отдельный блок
+    const roots = [...(kids.get(null) ?? [])];
+    const reach = new Set<string>();
+    const walk = (item: LayoutItem): void => {
+        if (reach.has(item.id)) return;
+        reach.add(item.id);
+        for (const k of kids.get(item.id) ?? []) walk(k);
+    };
+    roots.forEach(walk);
+    for (const item of [...items].sort(byOrder)) {
+        if (!reach.has(item.id)) {
+            roots.push(item);
+            walk(item);
+        }
     }
-    // what a cycle cut off from every root still gets a place / то, что цикл отрезал от всех корней, всё равно получает место
-    for (const item of items) {
-        if (seen.has(item.id)) continue;
-        place(item, 0, top);
-        top += block(item) + GAP_ROOT;
+
+    // the rows: the split whose whole picture is nearest to the aim / ряды: то разбиение, где вся картина ближе всего к цели
+    const sized = roots.map((item) => ({ item, block: measure(item) }));
+    const total = sized.reduce((sum, b) => sum + b.block.w + GAP_ROOT, 0);
+    let best: (typeof sized)[] | null = null;
+    let bestScore = Infinity;
+    for (let rows = Math.ceil(sized.length / ROW_MAX); rows <= Math.max(1, sized.length); rows++) {
+        const target = total / rows;
+        const split: (typeof sized)[] = [];
+        let row: typeof sized = [];
+        let width = 0;
+        for (const b of sized) {
+            row.push(b);
+            width += b.block.w + GAP_ROOT;
+            if (width >= target || row.length >= ROW_MAX) {
+                split.push(row);
+                row = [];
+                width = 0;
+            }
+        }
+        if (row.length > 0) split.push(row);
+        const w = Math.max(...split.map((r) => r.reduce((sum, b, i) => sum + b.block.w + (i > 0 ? GAP_ROOT : 0), 0)));
+        const h = split.reduce((sum, r, i) => sum + Math.max(...r.map((b) => b.block.h)) + (i > 0 ? GAP_ROOT : 0), 0);
+        const score = Math.abs(Math.log(w / Math.max(1, h) / ASPECT));
+        if (score < bestScore - 1e-9) {
+            bestScore = score;
+            best = split;
+        }
+    }
+    let top = 0;
+    for (const row of best ?? []) {
+        let x = 0;
+        for (const b of row) {
+            place(b.item, x, top);
+            x += b.block.w + GAP_ROOT;
+        }
+        top += Math.max(...row.map((b) => b.block.h)) + GAP_ROOT;
     }
     return out;
 }
@@ -403,6 +479,56 @@ export function curve(a: Anchor, b: Anchor | MapPoint, head = 0): Curve {
         arrow = `M${n1(tip.x)} ${n1(tip.y)}L${n1(base.x + nx * w)} ${n1(base.y + ny * w)}L${n1(base.x - nx * w)} ${n1(base.y - ny * w)}Z`;
     }
     return { d, head: arrow, mid };
+}
+
+const ROUND = 10;
+
+/** A polyline with rounded corners as an SVG path. / Ломаная со скруглёнными углами, путь SVG. */
+function rounded(points: readonly MapPoint[]): string {
+    let d = `M${n1(points[0]!.x)} ${n1(points[0]!.y)}`;
+    for (let i = 1; i < points.length - 1; i++) {
+        const a = points[i - 1]!;
+        const b = points[i]!;
+        const c = points[i + 1]!;
+        const la = Math.hypot(a.x - b.x, a.y - b.y);
+        const lc = Math.hypot(c.x - b.x, c.y - b.y);
+        const r = Math.min(ROUND, la / 2, lc / 2);
+        const p1 = { x: b.x + ((a.x - b.x) / (la || 1)) * r, y: b.y + ((a.y - b.y) / (la || 1)) * r };
+        const p2 = { x: b.x + ((c.x - b.x) / (lc || 1)) * r, y: b.y + ((c.y - b.y) / (lc || 1)) * r };
+        d += `L${n1(p1.x)} ${n1(p1.y)}Q${n1(b.x)} ${n1(b.y)} ${n1(p2.x)} ${n1(p2.y)}`;
+    }
+    const last = points[points.length - 1]!;
+    return `${d}L${n1(last.x)} ${n1(last.y)}`;
+}
+
+/**
+ * The tree line from a parent to one of its children. A child in the first column is reached by a smooth curve. A child in
+ * a later column (the column of children wrapped) is reached through the gaps: out of the parent into the gap beside it, up
+ * above the block, along the top over the columns before it, down the gap in front of its own column, and in. So no line
+ * runs through the cards of another column.
+ * Линия дерева от родителя к одному из детей. К ребёнку первого столбца ведёт плавная кривая. К ребёнку в следующем
+ * столбце (столбец детей перенесён) линия идёт по зазорам: от родителя в зазор рядом с ним, вверх над блоком, поверху над
+ * предыдущими столбцами, вниз по зазору перед своим столбцом и внутрь. Так ни одна линия не идёт сквозь карточки другого столбца.
+ */
+export function treePath(parent: Rect, child: Rect, siblings: readonly Rect[]): string {
+    const firstX = Math.min(child.x, ...siblings.map((r) => r.x));
+    if (child.x < firstX + CARD_W) {
+        const { from, to } = joinSides(parent, child);
+        return curve(from, to).d;
+    }
+    const top = Math.min(...siblings.map((r) => r.y)) - 22;
+    const trunkParent = parent.x + parent.w + GAP_X / 2;
+    const trunkChild = child.x - GAP_X / 2;
+    const py = parent.y + parent.h / 2;
+    const cy = child.y + child.h / 2;
+    return rounded([
+        { x: parent.x + parent.w, y: py },
+        { x: trunkParent, y: py },
+        { x: trunkParent, y: top },
+        { x: trunkChild, y: top },
+        { x: trunkChild, y: cy },
+        { x: child.x, y: cy },
+    ]);
 }
 
 // ───────────────────────────── the keyboard / клавиатура ─────────────────────────────

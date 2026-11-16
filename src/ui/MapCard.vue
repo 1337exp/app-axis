@@ -123,7 +123,8 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
 }
 
 .mcard--closed {
-    opacity: 0.6;
+    border-color: var(--tao-color-border);
+    background: var(--tao-color-surface);
 }
 
 .mcard__body {
@@ -156,6 +157,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
 
 .mcard--closed .mcard__title {
     color: var(--tao-color-text-muted);
+    font-weight: 400;
 }
 
 .mcard--dropped .mcard__title {
