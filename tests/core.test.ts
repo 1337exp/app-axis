@@ -9,7 +9,7 @@ import { diffRecord, parseEntry } from '../src/core/journal.ts';
 import { isDay, isId, normalizeRecord } from '../src/core/model.ts';
 import type { AxisRecord } from '../src/core/model.ts';
 import { docToText, preview, textToDoc } from '../src/core/text.ts';
-import { buildTree, canMove, descendants, flatten, orderFor, pathOf, percent, progressOf, progressOfAll } from '../src/core/tree.ts';
+import { buildTree, canMove, descendants, flatten, orderFor, pathOf, percent, progressOf, progressOfAll, shares } from '../src/core/tree.ts';
 
 const NOW = '2026-11-15T10:00:00.000Z';
 
@@ -231,5 +231,17 @@ describe('quick input', () => {
         expect(parseQuick('   ', 'task')).toBeNull();
         expect(parseQuick('? ', 'task')).toBeNull();
         expect(parseQuick('идея:', 'task')).toBeNull();
+    });
+});
+
+describe('the two parts of a progress bar', () => {
+    it('gives done first and in work after it, in whole percents, never above 100', () => {
+        expect(shares({ done: 1, total: 4, active: 1, questions: 0 })).toEqual({ done: 25, active: 25 });
+        expect(shares({ done: 3, total: 4, active: 1, questions: 0 })).toEqual({ done: 75, active: 25 });
+        expect(shares({ done: 2, total: 3, active: 1, questions: 0 })).toEqual({ done: 67, active: 33 });
+        // rounding must not push the two parts past the track
+        expect(shares({ done: 2, total: 3, active: 2, questions: 0 }).done + shares({ done: 2, total: 3, active: 2, questions: 0 }).active).toBeLessThanOrEqual(100);
+        expect(shares({ done: 0, total: 0, active: 0, questions: 0 })).toEqual({ done: 0, active: 0 });
+        expect(shares({ done: 0, total: 5, active: 0, questions: 2 })).toEqual({ done: 0, active: 0 });
     });
 });

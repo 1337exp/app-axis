@@ -148,7 +148,7 @@ const hint = computed(() => {
 
 .trow__draft {
     flex: none;
-    color: var(--tao-color-info);
+    color: var(--tao-color-text);
     font-size: 13px;
 }
 

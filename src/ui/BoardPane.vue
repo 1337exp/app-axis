@@ -206,13 +206,47 @@ function onDrop(status: Status, event: DragEvent): void {
     list-style: none;
 }
 
+/*
+ * The colour of a column is its status: a thin top border and a faint tint on the head; the cards carry only their icon.
+ * Цвет колонки это её статус: тонкая верхняя граница и слабый тон на шапке; на карточках только их иконка.
+ */
+.column--open {
+    --column: var(--axis-status-open);
+    --column-soft: color-mix(in srgb, var(--tao-color-text-muted) 7%, transparent);
+}
+
+.column--active {
+    --column: var(--axis-status-active);
+    --column-soft: var(--axis-status-active-soft);
+}
+
+.column--done {
+    --column: var(--axis-status-done);
+    --column-soft: var(--axis-status-done-soft);
+}
+
+.column--dropped {
+    /* the quietest of the four: the border is the danger colour mixed halfway into the surface / самая тихая из четырёх: граница это цвет опасности, наполовину смешанный с поверхностью */
+    --column: color-mix(in srgb, var(--axis-status-dropped) 55%, var(--tao-color-surface));
+    --column-soft: var(--axis-status-dropped-soft);
+}
+
+.column {
+    border-top: 3px solid var(--column);
+}
+
+.column__head {
+    background: var(--column-soft);
+    border-radius: var(--tao-radius-lg) var(--tao-radius-lg) 0 0;
+}
+
 /* dropped: the quietest column / отброшено: самая тихая колонка */
 .column--dropped .column__title,
 .column--dropped :deep(.card__title) {
     color: var(--tao-color-text-muted);
 }
 
-.column--dropped :deep(.card__type) {
-    color: var(--tao-color-text-disabled);
+.column--dropped .column__title {
+    font-weight: 500;
 }
 </style>

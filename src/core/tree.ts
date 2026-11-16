@@ -97,6 +97,19 @@ function count(sum: Progress, record: AxisRecord): void {
 /** Share done, 0…100, whole. An empty branch is 0. / Доля сделанного, целое 0…100. */
 export const percent = (p: Progress): number => (p.total === 0 ? 0 : Math.round((p.done / p.total) * 100));
 
+/**
+ * The two parts of a progress bar, in whole percents: what is done, then what is in work after it. Together never above 100,
+ * an empty branch is 0 and 0.
+ * Две части полосы прогресса в целых процентах: сделанное, потом после него то, что в работе. Вместе не больше 100,
+ * пустая ветка это 0 и 0.
+ */
+export function shares(p: Progress): { done: number; active: number } {
+    if (p.total === 0) return { done: 0, active: 0 };
+    const done = percent(p);
+    const active = Math.min(100 - done, Math.round((p.active / p.total) * 100));
+    return { done, active: Math.max(0, active) };
+}
+
 /** Ids under a record, without it. / Id всего, что под записью, без неё самой. */
 export function descendants(records: readonly AxisRecord[], id: string): string[] {
     const out: string[] = [];

@@ -121,7 +121,7 @@ function changes(entry: JournalEntry): string[] {
 }
 
 .entry__by--claude {
-    color: var(--tao-color-info-text);
+    color: var(--tao-color-text-strong);
 }
 
 .entry__body {

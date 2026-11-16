@@ -10,11 +10,12 @@
  */
 import { computed } from 'vue';
 import { progress, state } from '@/app/state';
-import { percent } from '@/core/tree';
+import { percent, shares } from '@/core/tree';
 import { useI18n } from '@/i18n';
 
 const { t } = useI18n();
 const share = computed(() => percent(progress.value));
+const work = computed(() => shares(progress.value).active);
 const tasks = computed(() => t('project.tasks', [progress.value.done, progress.value.total]));
 </script>
 
@@ -23,7 +24,7 @@ const tasks = computed(() => t('project.tasks', [progress.value.done, progress.v
         <template v-if="state.project">
             <template v-if="progress.total > 0">
                 <span class="status__track" role="progressbar" :aria-valuenow="share" aria-valuemin="0" aria-valuemax="100" :aria-label="tasks">
-                    <span class="status__fill" :style="{ width: `${share}%` }"></span>
+                    <span class="status__fill" :style="{ width: `${share}%` }"></span><span class="status__work" :style="{ width: `${work}%` }"></span>
                 </span>
                 <span class="status__item status__item--strong">{{ share }}%</span>
                 <span class="status__item status__tasks">{{ tasks }}</span>
@@ -61,11 +62,24 @@ const tasks = computed(() => t('project.tasks', [progress.value.done, progress.v
     overflow: hidden;
 }
 
-.status__fill {
+.status__track {
+    display: flex;
+}
+
+.status__fill,
+.status__work {
     display: block;
+    flex: none;
     height: 100%;
-    background: var(--tao-color-success);
     transition: width 0.3s ease;
+}
+
+.status__fill {
+    background: var(--axis-status-done);
+}
+
+.status__work {
+    background: var(--axis-status-active);
 }
 
 .status__item {

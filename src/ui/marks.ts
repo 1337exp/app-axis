@@ -26,6 +26,9 @@ export const typeIcon = (type: RecordType): string => TYPE_ICON[type];
 
 export const recordIcon = (record: Pick<AxisRecord, 'type' | 'status'>): string => (record.type === 'task' ? TASK_ICON[record.status] : TYPE_ICON[record.type]);
 
+/** The CSS colour of a status (the variables of `styles.css`). / CSS-цвет статуса (переменные `styles.css`). */
+export const statusVar = (status: Status): string => `var(--axis-status-${status})`;
+
 /** A class for the tone of the mark: the status in colour, always beside the words of the status. */
 export function toneClass(record: Pick<AxisRecord, 'type' | 'status'>): string {
     if (!hasStatus(record.type)) return 'mark--plain';

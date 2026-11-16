@@ -11,12 +11,12 @@
 import { TaoDropdownMenu, TaoIcon } from '@1337exp/taoui';
 import type { TaoMenuItem } from '@1337exp/taoui';
 import { computed } from 'vue';
-import { STATUSES } from '@/core/model';
+import { STATUSES, isStatus } from '@/core/model';
 import type { AxisRecord, Status } from '@/core/model';
 import { current, useI18n } from '@/i18n';
 import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
-import { isOverdue, statusKeyOf, typeIcon } from './marks';
+import { isOverdue, statusKeyOf, statusVar, toneClass, typeIcon } from './marks';
 
 const props = defineProps<{
     record: AxisRecord;
@@ -54,9 +54,14 @@ const onSelect = (id: string): void => {
 
 <template>
     <li class="card" :class="{ 'card--dragging': dragging }" draggable="true" @dragstart="emit('dragstart', $event)" @dragend="emit('dragend', $event)">
-        <span class="card__type" :title="t(`type.${record.type}`)"><TaoIcon :name="typeIcon(record.type)" /></span>
+        <span class="card__type" :class="toneClass(record)" :title="t(`type.${record.type}`)"><TaoIcon :name="typeIcon(record.type)" /></span>
         <button type="button" class="card__title" @click="emit('open')">{{ record.title }}</button>
-        <TaoDropdownMenu class="card__menu" :items="items" :menu-label="t('board.cardActions')" size="small" dots="horizontal" @select="onSelect" />
+        <TaoDropdownMenu class="card__menu" :items="items" :menu-label="t('board.cardActions')" size="small" dots="horizontal" @select="onSelect">
+            <template #item="{ id, label }">
+                <span v-if="isStatus(id)" class="status-dot" :class="`status-dot--${id}`" :style="{ '--dot': statusVar(id) }"></span>
+                <span class="tao-menu__text">{{ label }}</span>
+            </template>
+        </TaoDropdownMenu>
         <span v-if="path.length > 0" class="card__path" :title="path.join(' / ')">{{ path.join(' / ') }}</span>
         <span v-if="record.due || record.updatedBy === 'claude' || draft" class="card__meta">
             <span v-if="record.due" class="card__due" :class="{ 'card__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
@@ -94,7 +99,6 @@ const onSelect = (id: string): void => {
     display: inline-flex;
     align-items: center;
     height: 1.4em;
-    color: var(--tao-color-text-muted);
     font-size: 16px;
 }
 
@@ -171,7 +175,7 @@ const onSelect = (id: string): void => {
 /* a quiet pencil: the text has an unsaved draft / тихий карандаш: у текста есть несохранённый черновик */
 .card__draft {
     flex: none;
-    color: var(--tao-color-info);
+    color: var(--tao-color-text);
     font-size: 13px;
 }
 </style>

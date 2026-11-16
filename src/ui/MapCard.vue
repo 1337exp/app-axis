@@ -15,10 +15,11 @@
 import { TaoIcon } from '@1337exp/taoui';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AxisRecord } from '@/core/model';
+import { hasStatus } from '@/core/model';
 import { current, useI18n } from '@/i18n';
 import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
-import { isOverdue } from './marks';
+import { isOverdue, statusVar } from './marks';
 import StatusMark from './StatusMark.vue';
 
 const props = defineProps<{
@@ -29,7 +30,7 @@ const props = defineProps<{
     selected: boolean;
     draft: boolean;
     /** The progress of an area's branch. / Прогресс ветки раздела. */
-    progress: { done: number; total: number; share: number } | null;
+    progress: { done: number; total: number; share: number; active: number } | null;
 }>();
 
 /** The measured height, for the layout. / Измеренная высота для раскладки. */
@@ -60,8 +61,9 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
             'mcard--area': record.type === 'area',
             'mcard--closed': record.status === 'done' || record.status === 'dropped',
             'mcard--dropped': record.status === 'dropped',
+            'mcard--active': record.type !== 'area' && record.status === 'active',
         }"
-        :style="{ transform: `translate(${x}px, ${y}px)`, width: `${w}px` }"
+        :style="{ transform: `translate(${x}px, ${y}px)`, width: `${w}px`, '--edge': hasStatus(record.type) && record.status !== 'open' ? statusVar(record.status) : 'transparent' }"
         :data-node-id="record.id"
         tabindex="0"
         role="button"
@@ -74,7 +76,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
         </div>
 
         <div v-if="record.type === 'area' && progress && progress.total > 0" class="mcard__meta" :title="t('project.tasks', [progress.done, progress.total])">
-            <span class="mcard__bar"><span class="mcard__fill" :style="{ width: `${progress.share}%` }"></span></span>
+            <span class="mcard__bar"><span class="mcard__fill" :style="{ width: `${progress.share}%` }"></span><span class="mcard__work" :style="{ width: `${progress.active}%` }"></span></span>
             <span class="mcard__count">{{ progress.done }}/{{ progress.total }}</span>
         </div>
         <div v-else-if="record.type !== 'area' && (record.due || draft || record.body || record.images.length > 0 || record.updatedBy === 'claude')" class="mcard__meta">
@@ -190,7 +192,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
 }
 
 .mcard__draft {
-    color: var(--tao-color-info);
+    color: var(--tao-color-text);
 }
 
 .mcard__claude {
@@ -198,6 +200,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
 }
 
 .mcard__bar {
+    display: flex;
     flex: 1;
     height: 4px;
     border-radius: var(--tao-radius-full);
@@ -205,10 +208,35 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
     overflow: hidden;
 }
 
-.mcard__fill {
+.mcard__fill,
+.mcard__work {
     display: block;
+    flex: none;
     height: 100%;
-    background: var(--tao-color-success);
+}
+
+.mcard__fill {
+    background: var(--axis-status-done);
+}
+
+.mcard__work {
+    background: var(--axis-status-active);
+}
+
+/* the 3px edge in the colour of the status (none for "not started"); what is in work also gets a faint tint / кромка 3px цветом статуса (у «не начато» её нет); то, что в работе, получает ещё слабый тон */
+.mcard::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 3px;
+    border-radius: var(--tao-radius-panel) 0 0 var(--tao-radius-panel);
+    background: var(--edge, transparent);
+}
+
+.mcard--active {
+    background: var(--axis-status-active-soft);
 }
 
 /* the handles a link is dragged from: on the middle of each side, shown on hover and on a selected card */

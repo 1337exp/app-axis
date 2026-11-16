@@ -30,7 +30,7 @@ import { pathOf } from '@/core/tree';
 import { LOCALES, current, useI18n } from '@/i18n';
 import { formatDay, formatTime, dayOf } from './format';
 import JournalList from './JournalList.vue';
-import { recordIcon, statusKeyOf, toneClass } from './marks';
+import { recordIcon, statusKeyOf, statusVar, toneClass } from './marks';
 import TypeSelect from './TypeSelect.vue';
 
 const { t } = useI18n();
@@ -506,7 +506,9 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
         <div class="record__props">
             <TypeSelect v-model="type" class="record__type" :aria-label="t('record.type')" />
             <TaoSegmented v-if="hasStatus(record.type)" v-model="status" :aria-label="t('record.status')">
-                <TaoSegmentedOption v-for="s in STATUSES" :key="s" :value="s" :label="t(`status.${statusKey}.${s}`)" />
+                <TaoSegmentedOption v-for="s in STATUSES" :key="s" :value="s">
+                    <span class="status-dot" :class="`status-dot--${s}`" :style="{ '--dot': statusVar(s) }"></span>{{ t(`status.${statusKey}.${s}`) }}
+                </TaoSegmentedOption>
             </TaoSegmented>
             <TaoDate v-model="due" class="record__due" :placeholder="t('record.due')" :today-text="t('record.today')" :clear-text="t('record.dueClear')" :aria-label="t('record.due')" />
         </div>
@@ -693,7 +695,6 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
     height: var(--title-line);
     margin-top: var(--tao-control-padding-y);
     font-size: 22px;
-    color: var(--tao-color-text-muted);
 }
 
 .record__title {
@@ -966,19 +967,6 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 
 .mark {
     display: inline-flex;
-    color: var(--tao-color-text-muted);
-}
-
-.mark--active {
-    color: var(--tao-color-info);
-}
-
-.mark--done {
-    color: var(--tao-color-success);
-}
-
-.mark--dropped {
-    color: var(--tao-color-text-disabled);
 }
 
 .links__kind {

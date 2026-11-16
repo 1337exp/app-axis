@@ -20,8 +20,8 @@ const { t } = useI18n();
     width: 16px;
     height: 16px;
     border-radius: var(--tao-radius-full);
-    background: var(--tao-color-info-subtle);
-    color: var(--tao-color-info-text);
+    background: color-mix(in srgb, var(--tao-color-text) 14%, transparent);
+    color: var(--tao-color-text);
     font-size: 10px;
     font-weight: 700;
 }

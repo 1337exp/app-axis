@@ -12,7 +12,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
-import { percent, progressOf } from '@/core/tree';
+import { progressOf, shares } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { current, useI18n } from '@/i18n';
 import ClaudeMark from './ClaudeMark.vue';
@@ -57,11 +57,12 @@ const selected = computed({
     set: (id: string | string[] | null) => select(typeof id === 'string' ? id : null),
 });
 
-function row(id: string): { record: AxisRecord; done: number; total: number; share: number } | null {
+function row(id: string): { record: AxisRecord; done: number; total: number; share: number; active: number } | null {
     const node = nodeById.value.get(id);
     if (!node) return null;
     const p = node.children.length > 0 ? progressOf(node) : { done: 0, total: 0 };
-    return { record: node.record, done: p.done, total: p.total, share: percent({ ...p, active: 0, questions: 0 }) };
+    const part = shares({ ...p, active: 'active' in p ? p.active : 0, questions: 0 });
+    return { record: node.record, done: p.done, total: p.total, share: part.done, active: part.active };
 }
 
 async function run(work: () => Promise<unknown>): Promise<void> {
@@ -171,7 +172,7 @@ async function add(): Promise<void> {
                             <ClaudeMark v-if="r.record.updatedBy === 'claude'" />
                             <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': isOverdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
                             <span v-if="r.total > 0" class="row__progress" :title="t('project.tasks', [r.done, r.total])">
-                                <span class="row__bar"><span class="row__fill" :style="{ width: `${r.share}%` }"></span></span>
+                                <span class="row__bar"><span class="row__fill" :style="{ width: `${r.share}%` }"></span><span class="row__work" :style="{ width: `${r.active}%` }"></span></span>
                                 {{ r.done }}/{{ r.total }}
                             </span>
                         </span>
@@ -254,9 +255,9 @@ async function add(): Promise<void> {
     font-size: 13px;
 }
 
-/* an unsaved draft of the text: a quiet pencil, in the colour of the selection accent so it is not lost among the grey marks / набросок текста: тихий карандаш */
+/* an unsaved draft of the text: a pencil in the plain text colour, a little brighter than the grey marks (blue is for "in work") / набросок текста: карандаш цветом обычного текста, чуть ярче серых пометок (синий это «в работе») */
 .row__draft {
-    color: var(--tao-color-info);
+    color: var(--tao-color-text);
 }
 
 .row__due,
@@ -286,10 +287,23 @@ async function add(): Promise<void> {
     overflow: hidden;
 }
 
-.row__fill {
+.row__bar {
+    display: flex;
+}
+
+.row__fill,
+.row__work {
     display: block;
+    flex: none;
     height: 100%;
-    background: var(--tao-color-success);
+}
+
+.row__fill {
+    background: var(--axis-status-done);
+}
+
+.row__work {
+    background: var(--axis-status-active);
 }
 
 .quick {

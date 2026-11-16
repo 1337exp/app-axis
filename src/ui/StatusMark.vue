@@ -51,7 +51,6 @@ async function toggle(): Promise<void> {
     padding: 0;
     border: 0;
     background: none;
-    color: var(--tao-color-text-muted);
     font-size: 16px;
 }
 
@@ -67,17 +66,5 @@ async function toggle(): Promise<void> {
 .mark--button:focus-visible {
     outline: 2px solid var(--tao-color-accent);
     outline-offset: 2px;
-}
-
-.mark--active {
-    color: var(--tao-color-info);
-}
-
-.mark--done {
-    color: var(--tao-color-success);
-}
-
-.mark--dropped {
-    color: var(--tao-color-text-disabled);
 }
 </style>

@@ -46,10 +46,11 @@ import type { Direction, LayoutItem, MapPoint, Rect, Side } from '@/core/map';
 import { LINK_KINDS } from '@/core/model';
 import type { LinkKind } from '@/core/model';
 import { parseQuick } from '@/core/quick';
-import { percent, progressOf } from '@/core/tree';
+import { percent, progressOf, shares } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { useI18n } from '@/i18n';
 import FilterBar from './FilterBar.vue';
+import { emptyPlaceAt } from './hit';
 import MapCard from './MapCard.vue';
 import MapLines from './MapLines.vue';
 import type { Guide, TreeLine, TypedLine } from './MapLines.vue';
@@ -135,12 +136,12 @@ const rects = computed(() => {
 
 /** The progress of every area (and any card that has children), as in the tree. / Прогресс каждого раздела (и любой карточки с детьми), как в дереве. */
 const areaProgress = computed(() => {
-    const map = new Map<string, { done: number; total: number; share: number }>();
+    const map = new Map<string, { done: number; total: number; share: number; active: number }>();
     const walk = (nodes: readonly TreeNode[]): void => {
         for (const node of nodes) {
             if (node.children.length > 0) {
                 const p = progressOf(node);
-                map.set(node.record.id, { done: p.done, total: p.total, share: percent({ ...p, active: 0, questions: 0 }) });
+                map.set(node.record.id, { done: p.done, total: p.total, share: percent(p), active: shares(p).active });
             }
             walk(node.children);
         }
@@ -614,8 +615,8 @@ const options: CanvasOptions<Pin> = { pinAt, pinNear, zoom: LIMITS, inertia: tru
 /** A double click on an empty place: a new top-level record there. / Двойной клик по пустому месту: новая запись верхнего уровня там. */
 function onDouble(event: MouseEvent): void {
     const el = canvas.value?.root;
-    const target = event.target as Element | null;
-    if (!el || !target || !el.contains(target) || target.closest('[data-node-id], [data-conn-id], .map__ui')) return;
+    // the point, not `event.target`: the canvas holds the pointer capture, so the target is always the canvas (see `hit.ts`) / точка, а не `event.target`: холст держит захват, и цель всегда он сам
+    if (!el || !emptyPlaceAt(el, event.clientX, event.clientY)) return;
     const rect = el.getBoundingClientRect();
     const sx = event.clientX - rect.left;
     const sy = event.clientY - rect.top;
@@ -782,6 +783,8 @@ onBeforeUnmount(() => {
 /* the canvas takes the colours of the page: the grid is the quiet dots of the theme / холст берёт цвета страницы: сетка это тихие точки темы */
 .map-pane__stage :deep(.tx-canvas) {
     --tx-canvas-bg: var(--tao-color-bg);
+    /* half as strong as the theme's dots: enough to feel the canvas move while panning, not to flicker in the eyes / вдвое слабее точек темы: чтобы чувствовать движение холста при панораме, но не мельтешить в глазах */
+    --tx-canvas-dot: color-mix(in srgb, var(--tao-color-text) 5%, transparent);
 }
 
 .map-pane__empty {
