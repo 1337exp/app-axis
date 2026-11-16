@@ -14,6 +14,7 @@ import { computed } from 'vue';
 import { STATUSES } from '@/core/model';
 import type { AxisRecord, Status } from '@/core/model';
 import { current, useI18n } from '@/i18n';
+import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
 import { isOverdue, statusKeyOf, typeIcon } from './marks';
 
@@ -60,7 +61,7 @@ const onSelect = (id: string): void => {
         <span v-if="record.due || record.updatedBy === 'claude' || draft" class="card__meta">
             <span v-if="record.due" class="card__due" :class="{ 'card__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
             <TaoIcon v-if="draft" class="card__draft" name="tao-edit" :title="t('tree.hasDraft')" />
-            <span v-if="record.updatedBy === 'claude'" class="card__claude" :title="t('tree.byClaude')">C</span>
+            <ClaudeMark v-if="record.updatedBy === 'claude'" />
         </span>
     </li>
 </template>
@@ -172,18 +173,5 @@ const onSelect = (id: string): void => {
     flex: none;
     color: var(--tao-color-info);
     font-size: 13px;
-}
-
-.card__claude {
-    flex: none;
-    display: inline-grid;
-    place-items: center;
-    width: 16px;
-    height: 16px;
-    border-radius: var(--tao-radius-full);
-    background: var(--tao-color-info-subtle);
-    color: var(--tao-color-info-text);
-    font-size: 10px;
-    font-weight: 700;
 }
 </style>

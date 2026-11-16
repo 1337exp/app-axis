@@ -35,3 +35,21 @@ export function formatShort(day: string, locale: LocaleCode): string {
     const [y = 1970, m = 1, d = 1] = day.split('-').map(Number);
     return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d));
 }
+
+/** A date with its weekday for the timeline: "ср, 18 нояб." / "Wed, Nov 18". */
+export function formatWeekdayDay(day: string, locale: LocaleCode): string {
+    const [y = 1970, m = 1, d = 1] = day.split('-').map(Number);
+    return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d));
+}
+
+/** A month `YYYY-MM` as a header: "Декабрь 2026" / "December 2026" (the month alone and the year, without Russian "г."). */
+export function formatMonth(month: string, locale: LocaleCode): string {
+    const [y = 1970, m = 1] = month.split('-').map(Number);
+    const parts = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).formatToParts(new Date(y, m - 1, 1));
+    const text = parts
+        .filter((part) => part.type === 'month' || part.type === 'year' || (part.type === 'literal' && part.value.trim() === ''))
+        .map((part) => part.value)
+        .join('')
+        .trim();
+    return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+}

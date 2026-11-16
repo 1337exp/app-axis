@@ -103,6 +103,9 @@ export interface ProjectSummary extends AxisProject {
 /** Types whose status is shown and edited. An area has none: it shows the progress of what is inside. */
 export const hasStatus = (type: RecordType): boolean => type !== 'area' && type !== 'note';
 
+/** Finished for good: done or dropped. Such a record is no longer late and leaves the working views by default. / Закончена: готова или отброшена. */
+export const isClosed = (status: Status): boolean => status === 'done' || status === 'dropped';
+
 export const isRecordType = (value: unknown): value is RecordType => RECORD_TYPES.includes(value as RecordType);
 export const isStatus = (value: unknown): value is Status => STATUSES.includes(value as Status);
 export const isLinkKind = (value: unknown): value is LinkKind => LINK_KINDS.includes(value as LinkKind);

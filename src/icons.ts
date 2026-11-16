@@ -19,6 +19,8 @@ export function registerAppIcons(): void {
         link: { body: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>' },
         journal: { body: '<path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h6M8 12h6M8 16h3"/>' },
         board: { body: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>' },
+        // a vertical axis with dated entries on it / вертикальная ось с датированными записями
+        timeline: { body: '<path d="M6 3v18M11 6h9M11 12h9M11 18h6"/><circle cx="6" cy="6" r="1.8" fill="currentColor"/><circle cx="6" cy="12" r="1.8" fill="currentColor"/><circle cx="6" cy="18" r="1.8" fill="currentColor"/>' },
         tree: { body: '<path d="M5 5h5M5 5v14M5 12h5M5 19h5M13 5h6M13 12h6M13 19h6"/>' },
     });
 }

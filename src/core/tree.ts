@@ -158,3 +158,10 @@ export function pathOf(records: readonly AxisRecord[], id: string): AxisRecord[]
     }
     return path;
 }
+
+/** Titles of the areas above a record, from the top: what a card or a row shows as "where it lives". / Заголовки разделов над записью сверху вниз: «где она живёт» в карточке и строке. */
+export const areaPathOf = (records: readonly AxisRecord[], id: string): string[] =>
+    pathOf(records, id)
+        .slice(0, -1)
+        .filter((step) => step.type === 'area')
+        .map((step) => step.title);

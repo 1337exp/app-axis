@@ -10,61 +10,27 @@
  * или своим меню; клик открывает запись в панели справа. Данные те же реактивные, что и у дерева,
  * поэтому правка снаружи двигает карточку сама.
  */
-import { TaoButton, TaoDrawer, TaoEmpty, TaoSelect, toast } from '@1337exp/taoui';
-import { computed, reactive, ref, watch } from 'vue';
-import { hasDraft, patchRecord, select, selectedRecord, state, tree } from '@/app/state';
-import { defaultFilter, readFilter, writeFilter } from '@/app/boardFilter';
-import { BOARD_TYPES, groupByStatus } from '@/core/board';
-import type { AxisRecord, RecordType, Status } from '@/core/model';
-import { flatten, pathOf } from '@/core/tree';
+import { TaoEmpty, toast } from '@1337exp/taoui';
+import { computed, ref } from 'vue';
+import { hasDraft, patchRecord, select, state } from '@/app/state';
+import { groupByStatus } from '@/core/board';
+import type { AxisRecord, Status } from '@/core/model';
+import { areaPathOf } from '@/core/tree';
 import { useI18n } from '@/i18n';
 import BoardCard from './BoardCard.vue';
-import { typeIcon } from './marks';
-import RecordPane from './RecordPane.vue';
+import FilterBar from './FilterBar.vue';
+import RecordDrawer from './RecordDrawer.vue';
+import { useViewFilter } from './useViewFilter';
 
 const { t } = useI18n();
 
-// ───────────────────────────── the filter / фильтр ─────────────────────────────
-
-const filter = reactive(defaultFilter());
-watch(
-    () => state.projectId,
-    (id) => Object.assign(filter, readFilter(id)),
-    { immediate: true },
-);
-watch(filter, () => writeFilter(state.projectId, filter), { deep: true });
-
-const WHOLE = '*'; // not an id: ids never start with it / не id: id так не начинаются
-
-/** Areas in the order of the tree, indented by depth. / Разделы в порядке дерева, с отступом по глубине. */
-const areaOptions = computed(() => [
-    { value: WHOLE, label: t('board.wholeProject') },
-    ...flatten(tree.value)
-        .filter((node) => node.record.type === 'area')
-        .map((node) => ({ value: node.record.id, label: `${'   '.repeat(node.depth)}${node.record.title}` })),
-]);
-
-/** A branch that is gone (deleted, or saved in another session) counts as the whole project. / Удалённая ветка считается всем проектом. */
-const root = computed({
-    get: () => (filter.root && state.records.some((r) => r.id === filter.root && r.type === 'area') ? filter.root : WHOLE),
-    set: (value: string | number | null) => (filter.root = typeof value === 'string' && value !== WHOLE ? value : null),
-});
-
-const typeOn = (type: RecordType): boolean => filter.types.includes(type);
-function setType(type: RecordType, on: boolean): void {
-    filter.types = BOARD_TYPES.filter((candidate) => (candidate === type ? on : typeOn(candidate)));
-}
+// the filter (types and branch) is the one the timeline has too, kept apart per view / фильтр тот же, что у ленты, но у каждого вида свой
+const { filter, root, rootId, areaOptions, typeOn, setType } = useViewFilter('board');
 
 // ───────────────────────────── the columns / колонки ─────────────────────────────
 
-const columns = computed(() => groupByStatus(state.records, { types: filter.types, root: root.value === WHOLE ? null : root.value }));
+const columns = computed(() => groupByStatus(state.records, { types: filter.types, root: rootId.value }));
 const total = computed(() => columns.value.reduce((sum, column) => sum + column.records.length, 0));
-
-const pathOfCard = (record: AxisRecord): string[] =>
-    pathOf(state.records, record.id)
-        .slice(0, -1)
-        .filter((step) => step.type === 'area')
-        .map((step) => step.title);
 
 async function setStatus(record: AxisRecord, status: Status): Promise<void> {
     if (record.status === status) return;
@@ -112,56 +78,11 @@ function onDrop(status: Status, event: DragEvent): void {
     onDragEnd();
     void setStatus(record, status);
 }
-
-// ───────────────────────────── the drawer / панель записи ─────────────────────────────
-
-/**
- * The drawer is open while a record is selected (the address `~board/<record>` is the same thing). Closing it
- * deselects. The record pane saves what is typed when the record switches or the pane goes away, so a close
- * does not lose the last second of typing.
- *
- * Панель открыта, пока выбрана запись (адрес `~board/<запись>` то же самое). Закрытие снимает выбор.
- * Панель записи сохраняет набранное при смене записи и при исчезновении, так что закрытие
- * не теряет последнюю секунду набора.
- */
-const opened = computed({
-    get: () => selectedRecord.value !== null,
-    set: (value: boolean) => {
-        if (!value) select(null);
-    },
-});
-
-// the title stays while the drawer slides out, when nothing is selected any more / заголовок остаётся, пока панель уезжает
-const drawerTitle = ref('');
-watch(
-    () => selectedRecord.value?.type,
-    (type) => {
-        if (type) drawerTitle.value = t(`type.${type}`);
-    },
-    { immediate: true },
-);
 </script>
 
 <template>
     <section class="board-pane" :aria-label="t('board.label')">
-        <div class="board-bar" role="group" :aria-label="t('board.filters')">
-            <div class="board-bar__types" role="group" :aria-label="t('board.types')">
-                <TaoButton
-                    v-for="type in BOARD_TYPES"
-                    :key="type"
-                    variant="ghost"
-                    tone="neutral"
-                    :icon="typeIcon(type)"
-                    :pressed="typeOn(type)"
-                    :aria-label="t(`type.${type}`)"
-                    :title="t(`type.${type}`)"
-                    @update:pressed="(on: boolean) => setType(type, on)"
-                >
-                    <span class="board-bar__text">{{ t(`type.${type}`) }}</span>
-                </TaoButton>
-            </div>
-            <TaoSelect v-model="root" class="board-bar__branch" :options="areaOptions" :clearable="false" :aria-label="t('board.branch')" />
-        </div>
+        <FilterBar v-model:root="root" :type-on="typeOn" :area-options="areaOptions" @type="setType" />
 
         <TaoEmpty v-if="total === 0" class="board-empty" :title="t('board.empty')">{{ t('board.emptyText') }}</TaoEmpty>
 
@@ -185,7 +106,7 @@ watch(
                         v-for="record in column.records"
                         :key="record.id"
                         :record="record"
-                        :path="pathOfCard(record)"
+                        :path="areaPathOf(state.records, record.id)"
                         :dragging="dragging?.id === record.id"
                         :draft="hasDraft(record.id)"
                         @open="select(record.id)"
@@ -198,9 +119,7 @@ watch(
             </section>
         </div>
 
-        <TaoDrawer v-model="opened" class="board-drawer" :title="drawerTitle" side="right" :style="{ width: 'min(640px, 100%)' }">
-            <RecordPane v-if="selectedRecord" />
-        </TaoDrawer>
+        <RecordDrawer />
     </section>
 </template>
 
@@ -212,41 +131,6 @@ watch(
     min-width: 0;
     min-height: 0;
     height: 100%;
-}
-
-.board-bar {
-    flex: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--tao-space-2) var(--tao-space-4);
-    padding: var(--tao-space-2) var(--tao-space-3);
-    border-bottom: 1px solid var(--tao-color-border);
-}
-
-.board-bar__types {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--tao-space-1);
-}
-
-.board-bar__branch {
-    width: 240px;
-    max-width: 100%;
-    margin-left: auto;
-}
-
-/* a narrow window: the types are icons only (the words stay in the tooltip and for screen readers), the branch takes the rest of the row */
-@media (max-width: 600px) {
-    .board-bar__text {
-        display: none;
-    }
-
-    .board-bar__branch {
-        flex: 1;
-        width: auto;
-        min-width: 140px;
-    }
 }
 
 .board-empty {
@@ -336,12 +220,5 @@ watch(
 
 .column--dropped :deep(.card__type) {
     color: var(--tao-color-text-disabled);
-}
-</style>
-
-<style>
-/* the drawer is teleported to body, so these cannot be scoped; the drawer already has its own padding, the record has more */
-aside.board-drawer .tao-drawer__content {
-    padding: 0;
 }
 </style>

@@ -9,15 +9,17 @@
 import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoSelect, TaoTree, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
-import { addRecord, countInside, hasDraft, moveStep, outdent, patchRecord, recordById, removeRecord, select, state, tree } from '@/app/state';
+import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
 import { RECORD_TYPES } from '@/core/model';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
 import { percent, progressOf } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { current, useI18n } from '@/i18n';
+import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
-import { isOverdue, nextStatus, recordIcon, toneClass } from './marks';
+import { isOverdue } from './marks';
+import StatusMark from './StatusMark.vue';
 
 const { t } = useI18n();
 
@@ -69,8 +71,6 @@ async function run(work: () => Promise<unknown>): Promise<void> {
         toast().danger().message(error instanceof Error ? error.message : String(error));
     }
 }
-
-const toggle = (record: AxisRecord): Promise<void> => run(() => patchRecord(record.id, { status: nextStatus(record.status) }));
 
 function menuOf(record: AxisRecord): TaoMenuItem[] {
     return [
@@ -159,18 +159,7 @@ async function add(): Promise<void> {
             <TaoTree v-else v-model:expanded="expanded" v-model:selected="selected" :nodes="nodes" :aria-label="t('tree.label')">
                 <template #icon="{ node }">
                     <template v-for="r in [row(node.id)]" :key="node.id">
-                        <button
-                            v-if="r && r.record.type === 'task'"
-                            type="button"
-                            class="mark mark--button"
-                            :class="toneClass(r.record)"
-                            :title="`${t('tree.toggle')}: ${t(`status.task.${r.record.status}`)}`"
-                            tabindex="-1"
-                            @click.stop="toggle(r.record)"
-                        >
-                            <TaoIcon :name="recordIcon(r.record)" />
-                        </button>
-                        <span v-else-if="r" class="mark" :class="toneClass(r.record)"><TaoIcon :name="recordIcon(r.record)" /></span>
+                        <StatusMark v-if="r" :record="r.record" :tabbable="false" />
                     </template>
                 </template>
                 <template #label="{ node }">
@@ -180,7 +169,7 @@ async function add(): Promise<void> {
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
                             <TaoIcon v-if="hasDraft(r.record.id)" class="row__mark row__draft" name="tao-edit" :title="t('tree.hasDraft')" />
                             <TaoIcon v-if="r.record.images.length > 0" class="row__mark" name="image" />
-                            <span v-if="r.record.updatedBy === 'claude'" class="row__claude" :title="t('tree.byClaude')">C</span>
+                            <ClaudeMark v-if="r.record.updatedBy === 'claude'" />
                             <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': isOverdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
                             <span v-if="r.total > 0" class="row__progress" :title="t('project.tasks', [r.done, r.total])">
                                 <span class="row__bar"><span class="row__fill" :style="{ width: `${r.share}%` }"></span></span>
@@ -234,38 +223,6 @@ async function add(): Promise<void> {
     padding: var(--tao-space-2);
 }
 
-.mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--tao-color-text-muted);
-    font-size: 16px;
-}
-
-.mark--button {
-    cursor: pointer;
-    border-radius: var(--tao-radius-full);
-}
-
-.mark--button:hover {
-    color: var(--tao-color-text-strong);
-}
-
-.mark--active {
-    color: var(--tao-color-info);
-}
-
-.mark--done {
-    color: var(--tao-color-success);
-}
-
-.mark--dropped {
-    color: var(--tao-color-text-disabled);
-}
-
 .row {
     display: flex;
     align-items: center;
@@ -301,19 +258,6 @@ async function add(): Promise<void> {
 /* an unsaved draft of the text: a quiet pencil, in the colour of the selection accent so it is not lost among the grey marks / набросок текста: тихий карандаш */
 .row__draft {
     color: var(--tao-color-info);
-}
-
-.row__claude {
-    flex: none;
-    display: inline-grid;
-    place-items: center;
-    width: 16px;
-    height: 16px;
-    border-radius: var(--tao-radius-full);
-    background: var(--tao-color-info-subtle);
-    color: var(--tao-color-info-text);
-    font-size: 10px;
-    font-weight: 700;
 }
 
 .row__due,

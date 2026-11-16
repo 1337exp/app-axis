@@ -12,7 +12,7 @@ import { buildTree, descendants, progressOfAll } from '@/core/tree';
 import { ApiError, api } from './api';
 import type { RecordPatch } from './api';
 
-export type View = 'tree' | 'board' | 'journal';
+export type View = 'tree' | 'board' | 'timeline' | 'journal';
 
 export const state = reactive({
     /** The first load is over (with or without success). / Первая загрузка закончена. */
@@ -25,7 +25,7 @@ export const state = reactive({
     records: [] as AxisRecord[],
     /** Ids of the records that have an unsaved draft of the text. / Id записей с несохранённым черновиком текста. */
     drafts: [] as string[],
-    /** The record open in the current view: in the tree it is the selected row, on the board the one in the drawer. / Открытая запись текущего вида: в дереве выбранная строка, на доске запись в панели. */
+    /** The record open in the current view: in the tree it is the selected row, on the board and the timeline the one in the drawer. / Открытая запись текущего вида: в дереве выбранная строка, на доске и в ленте запись в панели. */
     selected: null as string | null,
     view: 'tree' as View,
     /** Grows on every change of the open project: panes that load something of their own watch it. */
@@ -42,9 +42,9 @@ export const hasDraft = (id: string): boolean => draftIds.value.has(id);
 
 /**
  * The tree's own selection, kept while another view is open: going tree → board → tree brings the same row back,
- * and what is open in the board's drawer never turns into a selection of the tree.
+ * and what is open in the drawer of the board or the timeline never turns into a selection of the tree.
  * Собственный выбор дерева, пока открыт другой вид: дерево → доска → дерево возвращает ту же строку,
- * а запись из панели доски не становится выбором дерева.
+ * а запись из панели доски или ленты не становится выбором дерева.
  */
 let treeSelected: string | null = null;
 
@@ -53,19 +53,31 @@ let treeSelected: string | null = null;
 // #/<project>/<record>          a record in the tree
 // #/<project>/~board            the board
 // #/<project>/~board/<record>   the board with that record open in the drawer
+// #/<project>/~timeline            the timeline by due dates
+// #/<project>/~timeline/<record>   the timeline with that record open in the drawer
 // #/<project>/~journal          the journal
 // The view is part of the address, so a reload brings back the same screen. / Вид входит в адрес: после перезагрузки тот же экран.
 
+/** The views that open a record in a drawer and name it in the address after the view. / Виды, которые открывают запись в панели и называют её в адресе после вида. */
+const DRAWER_VIEWS = ['board', 'timeline'] as const;
+
 function readHash(): { project: string; record: string | null; view: View } {
     const [project = '', rest = '', third = ''] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
-    if (rest === '~board') return { project, record: third || null, view: 'board' };
+    const drawer = DRAWER_VIEWS.find((view) => rest === `~${view}`);
+    if (drawer) return { project, record: third || null, view: drawer };
     if (rest === '~journal') return { project, record: null, view: 'journal' };
     return { project, record: rest && !rest.startsWith('~') ? rest : null, view: 'tree' };
 }
 
 function writeHash(): void {
     const tail =
-        state.view === 'journal' ? '/~journal' : state.view === 'board' ? `/~board${state.selected ? `/${state.selected}` : ''}` : state.selected ? `/${state.selected}` : '';
+        state.view === 'journal'
+            ? '/~journal'
+            : state.view === 'board' || state.view === 'timeline'
+              ? `/~${state.view}${state.selected ? `/${state.selected}` : ''}`
+              : state.selected
+                ? `/${state.selected}`
+                : '';
     const hash = state.projectId ? `#/${state.projectId}${tail}` : '';
     if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname);
 }
@@ -136,7 +148,7 @@ export async function refresh(): Promise<void> {
 
 export function select(id: string | null): void {
     state.selected = id;
-    // a record picked in the journal is shown in the tree; on the board it opens in the drawer and the board stays
+    // a record picked in the journal is shown in the tree; on the board and the timeline it opens in the drawer and the view stays
     if (id && state.view === 'journal') state.view = 'tree';
     writeHash();
 }
@@ -145,7 +157,7 @@ export function setView(view: View): void {
     if (view === state.view) return;
     if (state.view === 'tree') treeSelected = state.selected;
     state.view = view;
-    // on the board a selected record means an open drawer: arriving there must not open one;
+    // on the board and the timeline a selected record means an open drawer: arriving there must not open one;
     // the tree gets its own row back (if the record is still there), the journal shows none
     state.selected = view === 'tree' && treeSelected && recordById(treeSelected) ? treeSelected : null;
     writeHash();

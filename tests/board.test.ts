@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BOARD_STATUSES, BOARD_TYPES, DEFAULT_BOARD_TYPES, groupByStatus } from '../src/core/board.ts';
 import type { AxisRecord } from '../src/core/model.ts';
-import { defaultFilter, readFilter, writeFilter } from '../src/app/boardFilter.ts';
+import { defaultFilter, readFilter, writeFilter } from '../src/app/viewFilter.ts';
 
 const NOW = '2026-11-16T10:00:00.000Z';
 
@@ -112,23 +112,23 @@ describe('saved filter of the board', () => {
     };
 
     it('starts with tasks and questions, the whole project', () => {
-        expect(readFilter('p', fake())).toEqual({ types: ['task', 'question'], root: null });
+        expect(readFilter('board', 'p', fake())).toEqual({ types: ['task', 'question'], root: null });
         expect(defaultFilter()).toEqual({ types: ['task', 'question'], root: null });
     });
 
     it('keeps a filter per project', () => {
         const store = fake();
-        writeFilter('p', { types: ['idea'], root: 'a' }, store);
-        writeFilter('q', { types: ['task', 'decision'], root: null }, store);
-        expect(readFilter('p', store)).toEqual({ types: ['idea'], root: 'a' });
-        expect(readFilter('q', store)).toEqual({ types: ['task', 'decision'], root: null });
-        expect(readFilter('other', store)).toEqual(defaultFilter());
+        writeFilter('board', 'p', { types: ['idea'], root: 'a' }, store);
+        writeFilter('board', 'q', { types: ['task', 'decision'], root: null }, store);
+        expect(readFilter('board', 'p', store)).toEqual({ types: ['idea'], root: 'a' });
+        expect(readFilter('board', 'q', store)).toEqual({ types: ['task', 'decision'], root: null });
+        expect(readFilter('board', 'other', store)).toEqual(defaultFilter());
     });
 
     it('survives garbage in the storage', () => {
-        expect(readFilter('p', fake({ 'axis.board.p': '{not json' }))).toEqual(defaultFilter());
-        expect(readFilter('p', fake({ 'axis.board.p': '[]' }))).toEqual(defaultFilter());
-        expect(readFilter('p', fake({ 'axis.board.p': JSON.stringify({ types: ['area', 'idea', 'x'], root: '../x' }) }))).toEqual({ types: ['idea'], root: null });
+        expect(readFilter('board', 'p', fake({ 'axis.board.p': '{not json' }))).toEqual(defaultFilter());
+        expect(readFilter('board', 'p', fake({ 'axis.board.p': '[]' }))).toEqual(defaultFilter());
+        expect(readFilter('board', 'p', fake({ 'axis.board.p': JSON.stringify({ types: ['area', 'idea', 'x'], root: '../x' }) }))).toEqual({ types: ['idea'], root: null });
     });
 
     it('survives a storage that throws', () => {
@@ -140,7 +140,7 @@ describe('saved filter of the board', () => {
                 throw new Error('full');
             },
         };
-        expect(readFilter('p', broken)).toEqual(defaultFilter());
-        expect(() => writeFilter('p', defaultFilter(), broken)).not.toThrow();
+        expect(readFilter('board', 'p', broken)).toEqual(defaultFilter());
+        expect(() => writeFilter('board', 'p', defaultFilter(), broken)).not.toThrow();
     });
 });
