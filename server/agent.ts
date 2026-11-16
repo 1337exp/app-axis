@@ -8,7 +8,7 @@
 import type { JournalEntry } from '../src/core/journal.ts';
 import { hasStatus } from '../src/core/model.ts';
 import type { AxisProject, AxisRecord } from '../src/core/model.ts';
-import { docToText, preview } from '../src/core/text.ts';
+import { docToText, plainText, preview } from '../src/core/text.ts';
 import { buildTree, pathOf, progressOf, progressOfAll } from '../src/core/tree.ts';
 import type { Progress, TreeNode } from '../src/core/tree.ts';
 
@@ -105,7 +105,7 @@ export function search(records: readonly AxisRecord[], query: string): AxisRecor
     const words = query.toLowerCase().replaceAll('ё', 'е').split(/\s+/).filter(Boolean);
     if (words.length === 0) return [];
     return records.filter((record) => {
-        const hay = `${record.title}\n${docToText(record.body)}`.toLowerCase().replaceAll('ё', 'е');
+        const hay = `${record.title}\n${plainText(record.body)}`.toLowerCase().replaceAll('ё', 'е');
         return words.every((word) => hay.includes(word));
     });
 }

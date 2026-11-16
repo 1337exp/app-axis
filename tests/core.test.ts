@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PROFILES, normalizeDoc } from '@1337exp/taoeditor/core';
+import { recordText, search } from '../server/agent.ts';
+import { createStore } from '../server/store.ts';
 import { diffRecord, parseEntry } from '../src/core/journal.ts';
 import { isDay, isId, normalizeRecord } from '../src/core/model.ts';
 import type { AxisRecord } from '../src/core/model.ts';
@@ -110,7 +115,7 @@ describe('text', () => {
     const SAMPLE = [
         '# Формат проекта',
         '',
-        'Проект это **zip** с файлами, см. [спека](https://example.com/spec).',
+        'Проект это **zip** с файлами, см. [спека](https://example.com/spec).\\',
         'Вторая строка абзаца с `кодом` и *курсивом*.',
         '',
         '- первый',
@@ -122,15 +127,21 @@ describe('text', () => {
         '',
         '> цитата',
         '',
+        '| имя | значение |',
+        '| --- | --- |',
+        '| a | 1 |',
+        '| b | 2 |',
+        '',
         '```ts',
         'const a = **not bold**;',
         '```',
     ].join('\n');
 
-    it('survives a round trip', () => {
+    it('keeps the stored document when the text it gave is read back', () => {
         const doc = textToDoc(SAMPLE)!;
-        expect(docToText(doc)).toBe(SAMPLE);
-        expect(docToText(textToDoc(docToText(doc)))).toBe(SAMPLE);
+        expect(textToDoc(docToText(doc))).toEqual(doc);
+        const odd = textToDoc('2 * 3 * 4, some_var_name, # not a heading, 1. not a list')!;
+        expect(textToDoc(docToText(odd))).toEqual(odd);
     });
 
     it('makes a document the editor accepts as is', () => {
@@ -140,36 +151,48 @@ describe('text', () => {
         expect(clean).toEqual(doc);
     });
 
-    it('parses the pieces', () => {
-        const doc = textToDoc('a **b** `c*d*`\nnext')!;
-        expect(doc.content).toEqual([
-            {
-                type: 'paragraph',
-                content: [
-                    { type: 'text', text: 'a ' },
-                    { type: 'text', text: 'b', marks: [{ type: 'bold' }] },
-                    { type: 'text', text: ' ' },
-                    { type: 'text', text: 'c*d*', marks: [{ type: 'code' }] },
-                    { type: 'hardBreak' },
-                    { type: 'text', text: 'next' },
-                ],
-            },
-        ]);
+    it('keeps a line end inside a paragraph as a line break', () => {
+        const para = textToDoc('first\nsecond')!.content[0]!;
+        expect(para.content!.map((n) => n.type)).toEqual(['text', 'hardBreak', 'text']);
+        // the library writes that break as a backslash at the line end; both spellings give one document
+        expect(docToText(textToDoc('first\nsecond'))).toBe('first\\\nsecond');
+        expect(textToDoc('first\\\nsecond')).toEqual(textToDoc('first\nsecond'));
     });
 
-    it('leaves arithmetic and snake_case alone', () => {
-        expect(docToText(textToDoc('2 * 3 * 4 and some_var_name'))).toBe('2 * 3 * 4 and some_var_name');
-        expect(textToDoc('2 * 3 * 4 and some_var_name')!.content[0]!.content).toHaveLength(1);
-    });
-
-    it('gives null for nothing', () => {
+    it('gives null for nothing and "" for no document', () => {
         expect(textToDoc('')).toBeNull();
         expect(textToDoc('  \n\n ')).toBeNull();
         expect(docToText(null)).toBe('');
     });
 
-    it('cuts a preview to one line', () => {
+    it('cuts a preview to one line without marks', () => {
         expect(preview(textToDoc('# Title\n\nSome **text** here'), 16)).toBe('Title Some text…');
+        expect(preview(textToDoc('a_b `c`\n\n- x'))).toBe('a_b c x');
+        expect(preview(null)).toBe('');
+    });
+
+    it('reads a record to the agent and takes the same text back without changing the document', () => {
+        const root = mkdtempSync(join(tmpdir(), 'axis-core-'));
+        try {
+            const store = createStore(root);
+            store.createProject({ title: 'Demo', id: 'demo' });
+            const made = store.createRecord('demo', { type: 'note', title: 'N', text: SAMPLE }, 'claude');
+            const read = recordText(store.record('demo', made.id), store.records('demo'), [], (name) => name);
+            // `axis_read` prints the text after the header lines and an empty one; `axis_update` takes it as it is
+            const text = read.slice(read.indexOf('\n\n') + 2);
+            expect(text).toBe(SAMPLE);
+            const again = store.updateRecord('demo', made.id, { text }, 'claude');
+            expect(again.body).not.toBeNull();
+            expect(again.body).toEqual(made.body);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it('finds words in a text with marks and escapes', () => {
+        const withMarks = rec('a', { body: textToDoc('some_var and **bold** words') });
+        expect(search([withMarks], 'some_var bold')).toHaveLength(1);
+        expect(search([withMarks], 'missing')).toHaveLength(0);
     });
 });
 

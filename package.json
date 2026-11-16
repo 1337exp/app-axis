@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@1337exp/taoeditor": "^0.2.1",
+    "@1337exp/taoeditor": "^0.3.0",
     "@1337exp/taoui": "^5.48.0",
     "@1337exp/taoux": "^0.14.0",
     "vue": "^3.5.45"

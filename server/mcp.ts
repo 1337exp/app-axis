@@ -31,7 +31,7 @@ const str = (description: string): unknown => ({ type: 'string', description });
 const project = str('Project id (see axis_projects).');
 const recordId = str('Record id: the 8 characters in [brackets] in an outline.');
 const TEXT_HELP =
-    'Plain text with light Markdown: paragraphs split by an empty line, "# heading" (1-3), "- item" and "1. item" lists (nested by two spaces), "> quote", ``` code fences, **bold**, *italic*, `code`, [label](https://url).';
+    'Markdown (read and written as is, so what axis_read shows can be sent back unchanged): paragraphs split by an empty line, "# heading" (levels 1-3), **bold**, *italic*, ~~strikethrough~~, `inline code`, [label](https://url), "- item" and "1. item" lists (nested by indent), "> quote", ``` code blocks with a language, GFM tables. Nothing else is kept: no images, rules or task lists.';
 const WHY_HELP = 'Why this change is made, one or two sentences. Goes to the journal: it is the memory of the project, so give it whenever the reason is not obvious.';
 
 const need = (args: Args, key: string): string => {
