@@ -12,7 +12,7 @@
  */
 import { TaoButton, TaoDrawer, TaoEmpty, TaoSelect, toast } from '@1337exp/taoui';
 import { computed, reactive, ref, watch } from 'vue';
-import { patchRecord, select, selectedRecord, state, tree } from '@/app/state';
+import { hasDraft, patchRecord, select, selectedRecord, state, tree } from '@/app/state';
 import { defaultFilter, readFilter, writeFilter } from '@/app/boardFilter';
 import { BOARD_TYPES, groupByStatus } from '@/core/board';
 import type { AxisRecord, RecordType, Status } from '@/core/model';
@@ -187,6 +187,7 @@ watch(
                         :record="record"
                         :path="pathOfCard(record)"
                         :dragging="dragging?.id === record.id"
+                        :draft="hasDraft(record.id)"
                         @open="select(record.id)"
                         @status="(status) => setStatus(record, status)"
                         @dragstart="(event) => onDragStart(record, event)"
@@ -264,6 +265,8 @@ watch(
 }
 
 .column {
+    /* how far the focus ring of a card reaches: 2px outline + 1px offset / на сколько выступает кольцо фокуса карточки */
+    --ring: 3px;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -283,7 +286,8 @@ watch(
     display: flex;
     align-items: baseline;
     gap: var(--tao-space-2);
-    padding: var(--tao-space-3) var(--tao-space-3) var(--tao-space-2);
+    /* the list below starts with --ring of padding (for the focus ring of the first card), so the head gives it back */
+    padding: var(--tao-space-3) var(--tao-space-3) calc(var(--tao-space-2) - var(--ring));
 }
 
 .column__title {
@@ -306,7 +310,13 @@ watch(
     flex-direction: column;
     gap: var(--tao-space-2);
     margin: 0;
-    padding: 0 var(--tao-space-2) var(--tao-space-2);
+    /*
+     * The scroll area clips what sticks out of it, and the focus ring of a card (2px + 1px offset, see BoardCard) sticks out
+     * by --ring: without the padding on top the ring of the first card was cut. The bottom and the sides already have more.
+     * Область прокрутки обрезает всё, что выступает, а кольцо фокуса карточки (2px + отступ 1px) выступает на --ring:
+     * без отступа сверху кольцо первой карточки обрезалось. Снизу и по бокам места уже больше.
+     */
+    padding: var(--ring) var(--tao-space-2) var(--tao-space-2);
     list-style: none;
     overflow-y: auto;
 }

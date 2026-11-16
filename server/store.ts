@@ -6,13 +6,16 @@
  *   <data>/<project>/records/<id>.json     one record per file
  *   <data>/<project>/journal.jsonl         a line per change, appended
  *   <data>/<project>/assets/<name>         pictures
+ *   <data>/<project>/drafts/<id>.json       an unsaved text of a record: { body, base, at, by } (not in the journal)
  *   <data>/<project>/trash/<id>.json       what was deleted (nothing is unlinked)
+ *   <data>/<project>/trash/<id>.draft.json the draft of a deleted record
  *
  * Хранилище: проекты как папки обычных файлов. Истина в файлах: страница, MCP-сервер и рука с текстовым
  * редактором меняют одни и те же файлы, а кто следит за папкой, видит изменение. Удалённое уходит в `trash/`.
+ * Черновик текста записи лежит в `drafts/`, в журнал не попадает; черновик удалённой записи уходит в `trash/`.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROFILES, isEmptyDoc, normalizeDoc } from '@1337exp/taoeditor/core';
 import type { Doc } from '@1337exp/taoeditor/core';
@@ -22,6 +25,7 @@ import {
     RECORD_VERSION,
     cleanTitle,
     isAssetName,
+    isAuthor,
     isDay,
     isId,
     isLinkKind,
@@ -29,16 +33,23 @@ import {
     isStatus,
     normalizeRecord,
 } from '../src/core/model.ts';
-import type { Author, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
+import type { Author, AxisDraft, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
 import { textToDoc } from '../src/core/text.ts';
 import { canMove, descendants, orderFor, progressOfAll } from '../src/core/tree.ts';
 
-/** A refusal with a reason the caller can show. `status` is the HTTP code it maps to. / Отказ с причиной для показа. */
+/**
+ * A refusal with a reason the caller can show. `status` is the HTTP code it maps to; `data` is sent along with the
+ * reason (a 409 on a stale save carries the current `record`).
+ * Отказ с причиной для показа. `status` это HTTP-код; `data` уходит вместе с причиной
+ * (409 на устаревшее сохранение несёт текущую `record`).
+ */
 export class AxisError extends Error {
     readonly status: number;
-    constructor(status: number, message: string) {
+    readonly data: Record<string, unknown> | undefined;
+    constructor(status: number, message: string, data?: Record<string, unknown>) {
         super(message);
         this.status = status;
+        this.data = data;
     }
 }
 
@@ -57,6 +68,19 @@ export interface RecordInput {
     images?: unknown;
     /** The reason: goes to the journal. / Причина: попадает в журнал. */
     why?: unknown;
+    /**
+     * The `updated` stamp the caller's change was made against (the page sends the base of its draft). If the record
+     * has moved on, the change is refused with 409 and the current record. Callers that do not send it are not checked.
+     * Штамп `updated`, против которого сделана правка (страница шлёт base своего черновика). Если запись ушла вперёд,
+     * правка отклоняется кодом 409 с текущей записью. Кто `base` не шлёт, не проверяется.
+     */
+    base?: unknown;
+}
+
+/** What the page sends for a draft. / Что страница шлёт для черновика. */
+export interface DraftInput {
+    body?: unknown;
+    base?: unknown;
 }
 
 export interface ProjectInput {
@@ -116,6 +140,14 @@ export interface Store {
     updateRecord(project: string, id: string, input: RecordInput, by: Author): AxisRecord;
     /** Removes the record and everything under it; returns the removed ids. / Удаляет запись со всем вложенным. */
     deleteRecord(project: string, id: string, by: Author, why?: unknown): string[];
+    /** The unsaved text of a record, or null when there is none. / Несохранённый текст записи или null. */
+    draft(project: string, id: string): AxisDraft | null;
+    /** Writes (replaces) the draft. Not in the journal. / Пишет (заменяет) черновик. В журнал не идёт. */
+    saveDraft(project: string, id: string, input: DraftInput, by: Author): AxisDraft;
+    /** Drops the draft; false when there was none. / Убирает черновик; false, если его не было. */
+    deleteDraft(project: string, id: string): boolean;
+    /** Ids of the records that have a draft. / Id записей, у которых есть черновик. */
+    drafts(project: string): string[];
     journal(project: string, options?: { limit?: number; record?: string }): JournalEntry[];
     /** A free note in the journal. / Свободная заметка в журнале. */
     log(project: string, text: unknown, record: unknown, by: Author): JournalEntry;
@@ -177,15 +209,30 @@ export function createStore(root: string): Store {
         return text ? { text } : {};
     };
 
-    /** The body from `body` (a document) or `text` (light Markdown), through the editor's gate. */
-    const bodyOf = (input: RecordInput): Doc | null | undefined => {
-        let doc: unknown;
-        if (typeof input.text === 'string') doc = textToDoc(input.text);
-        else if (input.body !== undefined) doc = input.body;
-        else return undefined;
-        if (doc === null) return null;
+    /** A document through the editor's gate; an empty one is null. / Документ через ворота редактора; пустой это null. */
+    const cleanBody = (doc: unknown): Doc | null => {
+        if (doc === null || doc === undefined) return null;
         const clean = normalizeDoc(doc, PROFILES.article).doc;
         return isEmptyDoc(clean) ? null : clean;
+    };
+
+    /** The body from `body` (a document) or `text` (light Markdown), through the editor's gate. */
+    const bodyOf = (input: RecordInput): Doc | null | undefined => {
+        if (typeof input.text === 'string') return cleanBody(textToDoc(input.text));
+        if (input.body !== undefined) return cleanBody(input.body);
+        return undefined;
+    };
+
+    const draftFile = (project: string, id: string): string => {
+        if (!isId(id)) throw new AxisError(400, `Bad record id: ${String(id)}`);
+        return join(dir(project), 'drafts', `${id}.json`);
+    };
+
+    /** A draft from its file; one without a `base` is not a draft Axis wrote, so it is not one. */
+    const readDraft = (project: string, id: string): AxisDraft | null => {
+        const raw = readJson(draftFile(project, id)) as Partial<AxisDraft> | undefined;
+        if (!raw || typeof raw !== 'object' || typeof raw.base !== 'string' || raw.base === '') return null;
+        return { body: cleanBody(raw.body), base: raw.base, at: typeof raw.at === 'string' ? raw.at : now(), by: isAuthor(raw.by) ? raw.by : 'user' };
     };
 
     const linksOf = (value: unknown, self: string, all: readonly AxisRecord[]): RecordLink[] => {
@@ -316,6 +363,11 @@ export function createStore(root: string): Store {
             const all = readRecords(project);
             const before = all.find((r) => r.id === id);
             if (!before) throw new AxisError(404, `No record "${String(id)}" in "${project}"`);
+            // a change made against an older version of the record is refused, with the record as it is now
+            if (input.base !== undefined) {
+                if (typeof input.base !== 'string') throw new AxisError(400, '"base" is the "updated" stamp of the record the change was made against');
+                if (input.base !== before.updated) throw new AxisError(409, 'The record was changed after you started: here is its current state', { record: before });
+            }
             const after: AxisRecord = { ...before };
             if (input.title !== undefined) {
                 const title = cleanTitle(input.title);
@@ -369,6 +421,9 @@ export function createStore(root: string): Store {
             for (const one of gone) {
                 const from = join(base, 'records', `${one}.json`);
                 if (existsSync(from)) renameSync(from, join(base, 'trash', `${one}.json`));
+                // the draft of a deleted record goes to the trash beside it (it is not erased, as nothing is)
+                const draft = join(base, 'drafts', `${one}.json`);
+                if (existsSync(draft)) renameSync(draft, join(base, 'trash', `${one}.draft.json`));
             }
             // links that pointed at what is gone are taken away, quietly
             for (const record of all) {
@@ -379,6 +434,40 @@ export function createStore(root: string): Store {
             const text = [why(reason).text, extra].filter(Boolean).join(' ');
             append(project, { t: now(), by, kind: 'delete', record: id, title: target.title, ...(text ? { text } : {}) });
             return gone;
+        },
+
+        draft: readDraft,
+
+        saveDraft(project, id, input, by) {
+            const file = draftFile(project, id); // 400 for an id that is not one
+            const record = this.record(project, id); // 404 for a record that is not there
+            if (input.body === undefined) throw new AxisError(400, '"body" is a document or null');
+            let base: string;
+            if (input.base !== undefined) {
+                if (typeof input.base !== 'string' || input.base === '') throw new AxisError(400, '"base" is the "updated" stamp of the record the draft was started on');
+                base = input.base;
+            } else base = readDraft(project, id)?.base ?? record.updated; // the first write without a base starts on the record as it is
+            const draft: AxisDraft = { body: cleanBody(input.body), base, at: now(), by };
+            mkdirSync(join(dir(project), 'drafts'), { recursive: true });
+            writeJson(file, draft);
+            return draft;
+        },
+
+        deleteDraft(project, id) {
+            const file = draftFile(project, id);
+            if (!existsSync(file)) return false;
+            rmSync(file, { force: true });
+            return true;
+        },
+
+        drafts(project) {
+            const folder = join(dir(project), 'drafts');
+            if (!existsSync(folder)) return [];
+            return readdirSync(folder)
+                .filter((name) => name.endsWith('.json'))
+                .map((name) => name.slice(0, -'.json'.length))
+                .filter((id) => isId(id) && readDraft(project, id) !== null)
+                .sort();
         },
 
         journal(project, options = {}) {

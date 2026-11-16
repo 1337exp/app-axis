@@ -22,6 +22,8 @@ const props = defineProps<{
     /** Titles of the areas above the record, from the top. / Заголовки разделов над записью, сверху вниз. */
     path: readonly string[];
     dragging?: boolean;
+    /** The record has an unsaved draft of its text. / У записи есть несохранённый черновик текста. */
+    draft?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -55,8 +57,9 @@ const onSelect = (id: string): void => {
         <button type="button" class="card__title" @click="emit('open')">{{ record.title }}</button>
         <TaoDropdownMenu class="card__menu" :items="items" :menu-label="t('board.cardActions')" size="small" dots="horizontal" @select="onSelect" />
         <span v-if="path.length > 0" class="card__path" :title="path.join(' / ')">{{ path.join(' / ') }}</span>
-        <span v-if="record.due || record.updatedBy === 'claude'" class="card__meta">
+        <span v-if="record.due || record.updatedBy === 'claude' || draft" class="card__meta">
             <span v-if="record.due" class="card__due" :class="{ 'card__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
+            <TaoIcon v-if="draft" class="card__draft" name="tao-edit" :title="t('tree.hasDraft')" />
             <span v-if="record.updatedBy === 'claude'" class="card__claude" :title="t('tree.byClaude')">C</span>
         </span>
     </li>
@@ -162,6 +165,13 @@ const onSelect = (id: string): void => {
 
 .card__due--late {
     color: var(--tao-color-danger-text);
+}
+
+/* a quiet pencil: the text has an unsaved draft / тихий карандаш: у текста есть несохранённый черновик */
+.card__draft {
+    flex: none;
+    color: var(--tao-color-info);
+    font-size: 13px;
 }
 
 .card__claude {

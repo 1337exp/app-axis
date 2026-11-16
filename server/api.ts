@@ -13,7 +13,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { isAuthor, isId } from '../src/core/model.ts';
 import type { Author } from '../src/core/model.ts';
 import { ASSET_MAX_BYTES, AxisError } from './store.ts';
-import type { ProjectInput, RecordInput, Store } from './store.ts';
+import type { DraftInput, ProjectInput, RecordInput, Store } from './store.ts';
 
 const JSON_MAX_BYTES = 4 * 1024 * 1024;
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -133,7 +133,7 @@ export function createApi(store: Store): Api {
         }
 
         if (section === undefined) {
-            if (method === 'GET') return send(res, 200, { project: store.project(project), records: store.records(project) });
+            if (method === 'GET') return send(res, 200, { project: store.project(project), records: store.records(project), drafts: store.drafts(project) });
             if (method === 'PATCH') return send(res, 200, { project: store.updateProject(project, (await readJsonBody(req)) as ProjectInput) });
             throw new AxisError(405, 'GET or PATCH');
         }
@@ -143,6 +143,14 @@ export function createApi(store: Store): Api {
                 if (method === 'POST') return send(res, 201, { record: store.createRecord(project, (await readJsonBody(req)) as RecordInput, author(req)) });
                 throw new AxisError(405, 'POST');
             }
+            if (path[4] === 'draft') {
+                // the unsaved text of the record: kept as a file, not in the record and not in the journal
+                if (method === 'GET') return send(res, 200, { draft: store.draft(project, item) });
+                if (method === 'PUT') return send(res, 200, { draft: store.saveDraft(project, item, (await readJsonBody(req)) as DraftInput, author(req)) });
+                if (method === 'DELETE') return send(res, 200, { deleted: store.deleteDraft(project, item) });
+                throw new AxisError(405, 'GET, PUT or DELETE');
+            }
+            if (path[4] !== undefined) throw new AxisError(404, 'No such address');
             if (method === 'GET') return send(res, 200, { record: store.record(project, item), journal: store.journal(project, { record: item, limit: 100 }) });
             if (method === 'PATCH') return send(res, 200, { record: store.updateRecord(project, item, (await readJsonBody(req)) as RecordInput, author(req)) });
             if (method === 'DELETE') {
@@ -195,7 +203,8 @@ export function createApi(store: Store): Api {
                 const status = error instanceof AxisError ? error.status : 500;
                 const message = error instanceof Error ? error.message : 'Unknown error';
                 if (status === 500) console.error('[axis]', error);
-                if (!res.headersSent) send(res, status, { error: message });
+                // a refusal may carry data (409: the current record); `error` always wins over a key of the same name
+                if (!res.headersSent) send(res, status, { ...(error instanceof AxisError ? error.data : undefined), error: message });
                 else res.end();
             }
             return true;

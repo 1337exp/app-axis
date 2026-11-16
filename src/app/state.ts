@@ -6,7 +6,8 @@
  * страница держит копию и обновляет её, когда сервер говорит, что что-то изменилось, кто бы это ни сделал.
  */
 import { computed, reactive } from 'vue';
-import type { AxisProject, AxisRecord, ProjectSummary } from '@/core/model';
+import type { Doc } from '@1337exp/taoeditor/core';
+import type { AxisDraft, AxisProject, AxisRecord, ProjectSummary } from '@/core/model';
 import { buildTree, descendants, progressOfAll } from '@/core/tree';
 import { ApiError, api } from './api';
 import type { RecordPatch } from './api';
@@ -22,6 +23,9 @@ export const state = reactive({
     projectId: '',
     project: null as AxisProject | null,
     records: [] as AxisRecord[],
+    /** Ids of the records that have an unsaved draft of the text. / Id записей с несохранённым черновиком текста. */
+    drafts: [] as string[],
+    /** The record open in the current view: in the tree it is the selected row, on the board the one in the drawer. / Открытая запись текущего вида: в дереве выбранная строка, на доске запись в панели. */
     selected: null as string | null,
     view: 'tree' as View,
     /** Grows on every change of the open project: panes that load something of their own watch it. */
@@ -32,6 +36,17 @@ export const tree = computed(() => buildTree(state.records));
 export const progress = computed(() => progressOfAll(state.records));
 export const selectedRecord = computed(() => state.records.find((r) => r.id === state.selected) ?? null);
 export const recordById = (id: string): AxisRecord | undefined => state.records.find((r) => r.id === id);
+const draftIds = computed(() => new Set(state.drafts));
+/** Whether the record has an unsaved draft of its text. / Есть ли у записи несохранённый черновик текста. */
+export const hasDraft = (id: string): boolean => draftIds.value.has(id);
+
+/**
+ * The tree's own selection, kept while another view is open: going tree → board → tree brings the same row back,
+ * and what is open in the board's drawer never turns into a selection of the tree.
+ * Собственный выбор дерева, пока открыт другой вид: дерево → доска → дерево возвращает ту же строку,
+ * а запись из панели доски не становится выбором дерева.
+ */
+let treeSelected: string | null = null;
 
 // ───────────────────────────── the address / адрес ─────────────────────────────
 // #/<project>                  the tree
@@ -89,15 +104,19 @@ export async function openProject(id: string, record: string | null = null, view
         state.projectId = '';
         state.project = null;
         state.records = [];
+        state.drafts = [];
         state.selected = null;
+        treeSelected = null;
         writeHash();
         return;
     }
     state.projectId = id;
     state.project = data.project;
     state.records = data.records;
+    state.drafts = data.drafts ?? [];
     state.selected = record && data.records.some((r) => r.id === record) ? record : null;
     state.view = view;
+    treeSelected = view === 'tree' ? state.selected : null;
     state.tick += 1;
     writeHash();
 }
@@ -109,6 +128,7 @@ export async function refresh(): Promise<void> {
     if (!data) return;
     state.project = data.project;
     state.records = data.records;
+    state.drafts = data.drafts ?? [];
     if (state.selected && !data.records.some((r) => r.id === state.selected)) state.selected = null;
     state.tick += 1;
     writeHash();
@@ -122,9 +142,12 @@ export function select(id: string | null): void {
 }
 
 export function setView(view: View): void {
+    if (view === state.view) return;
+    if (state.view === 'tree') treeSelected = state.selected;
     state.view = view;
-    // on the board a selected record means an open drawer: arriving there must not open one
-    if (view === 'board') state.selected = null;
+    // on the board a selected record means an open drawer: arriving there must not open one;
+    // the tree gets its own row back (if the record is still there), the journal shows none
+    state.selected = view === 'tree' && treeSelected && recordById(treeSelected) ? treeSelected : null;
     writeHash();
 }
 
@@ -149,14 +172,64 @@ export async function addRecord(input: RecordPatch & { title: string }): Promise
 }
 
 export async function patchRecord(id: string, patch: RecordPatch): Promise<AxisRecord> {
-    const record = await api.updateRecord(state.projectId, id, patch);
-    put(record);
-    return record;
+    try {
+        const record = await api.updateRecord(state.projectId, id, patch);
+        put(record);
+        return record;
+    } catch (error) {
+        // a refused stale save brings the record as it is now: the page takes it before it says anything
+        if (error instanceof ApiError && error.status === 409 && error.data.record) put(error.data.record);
+        throw error;
+    }
+}
+
+// ───────────────────────────── drafts / черновики ─────────────────────────────
+// The text typed in the editor is kept on the server as a draft (a file), not in the record and not in the journal,
+// until the person presses Save. The page only learns from here which records have one.
+// Набранный в редакторе текст лежит на сервере черновиком (файлом), не в записи и не в журнале, пока человек не
+// нажмёт «Сохранить». Отсюда страница знает только, у каких записей он есть.
+
+/**
+ * Draft calls go through one queue, in order, for the whole page: a write sent when a pane goes away lands before the
+ * next pane asks for the draft, and a delete never overtakes a write (which would bring the draft back).
+ * Вызовы черновика идут через одну очередь по порядку на всю страницу: запись, отправленная при уходе панели,
+ * ложится раньше, чем следующая панель попросит черновик, а удаление не обгоняет запись (она вернула бы черновик).
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function inQueue<T>(work: () => Promise<T>): Promise<T> {
+    const run = queue.then(work);
+    queue = run.catch(() => undefined);
+    return run;
+}
+
+/** The draft of a record, or null; after the writes that are on their way. / Черновик записи или null; после уже отправленных записей. */
+export const loadDraft = (project: string, id: string): Promise<AxisDraft | null> => inQueue(() => api.draft(project, id));
+
+/**
+ * Writes the draft. The record is marked at once (the mark is where the draft will be when the queue is done).
+ * `project` is passed in: the person may have moved to another one meanwhile.
+ * Пишет черновик. Отметка ставится сразу (она показывает, где черновик будет, когда очередь пройдёт).
+ */
+export function writeDraft(project: string, id: string, body: Doc | null, base: string, keepalive = false): Promise<AxisDraft> {
+    const here = project === state.projectId;
+    const had = state.drafts.includes(id);
+    if (here && !had) state.drafts.push(id);
+    return inQueue(() => api.putDraft(project, id, { body, base }, keepalive)).catch((error: unknown) => {
+        if (here && !had && project === state.projectId) state.drafts = state.drafts.filter((d) => d !== id);
+        throw error;
+    });
+}
+
+/** Drops the draft and the mark. / Убирает черновик и отметку. */
+export function dropDraft(project: string, id: string): Promise<void> {
+    if (project === state.projectId) state.drafts = state.drafts.filter((d) => d !== id);
+    return inQueue(() => api.deleteDraft(project, id)).then(() => undefined);
 }
 
 export async function removeRecord(id: string): Promise<void> {
     const gone = await api.deleteRecord(state.projectId, id);
     state.records = state.records.filter((r) => !gone.includes(r.id));
+    state.drafts = state.drafts.filter((d) => !gone.includes(d));
     if (state.selected && gone.includes(state.selected)) select(null);
 }
 
@@ -236,6 +309,7 @@ export function init(): void {
         if (!at.project || !state.projects.some((p) => p.id === at.project)) return;
         if (at.project !== state.projectId) void openProject(at.project, at.record, at.view);
         else {
+            if (state.view === 'tree') treeSelected = state.selected;
             state.selected = at.record && state.records.some((r) => r.id === at.record) ? at.record : null;
             state.view = at.view;
         }

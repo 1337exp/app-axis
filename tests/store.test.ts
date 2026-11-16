@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -141,6 +141,110 @@ describe('records', () => {
         const all = store.records('demo');
         expect(all).toHaveLength(1);
         expect(all[0]).toMatchObject({ id: 'byhand01', type: 'idea', status: 'open', parent: null });
+    });
+});
+
+const paragraph = (text: string) => ({ v: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+
+describe('drafts', () => {
+    it('keeps the unsaved text in a file, not in the record and not in the journal', () => {
+        const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'old' }, 'user');
+        const lines = store.journal('demo').length;
+        expect(store.draft('demo', r.id)).toBeNull();
+        expect(store.drafts('demo')).toEqual([]);
+
+        const draft = store.saveDraft('demo', r.id, { body: paragraph('new, typed slowly'), base: r.updated }, 'user');
+        expect(draft).toMatchObject({ base: r.updated, by: 'user' });
+        expect(docToText(draft.body)).toBe('new, typed slowly');
+        // the file is the truth: { body, base, at, by }
+        const file = JSON.parse(readFileSync(join(root, 'demo', 'drafts', `${r.id}.json`), 'utf8'));
+        expect(Object.keys(file).sort()).toEqual(['at', 'base', 'body', 'by']);
+        expect(store.draft('demo', r.id)).toEqual(draft);
+        expect(store.drafts('demo')).toEqual([r.id]);
+
+        // typing again replaces it, however often: the record and the journal stay as they were
+        store.saveDraft('demo', r.id, { body: paragraph('new, typed slowly, more'), base: r.updated }, 'user');
+        store.saveDraft('demo', r.id, { body: paragraph('and more') }, 'claude'); // no base: the draft keeps its own
+        expect(store.draft('demo', r.id)).toMatchObject({ base: r.updated, by: 'claude' });
+        expect(docToText(store.record('demo', r.id).body)).toBe('old');
+        expect(store.record('demo', r.id).updated).toBe(r.updated);
+        expect(store.journal('demo')).toHaveLength(lines);
+
+        expect(store.deleteDraft('demo', r.id)).toBe(true);
+        expect(store.deleteDraft('demo', r.id)).toBe(false);
+        expect(store.draft('demo', r.id)).toBeNull();
+        expect(store.drafts('demo')).toEqual([]);
+    });
+
+    it('lets a draft be empty and keeps it clean', () => {
+        const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'old' }, 'user');
+        expect(store.saveDraft('demo', r.id, { body: null, base: r.updated }, 'user').body).toBeNull(); // "I cleared it" is a draft too
+        expect(store.saveDraft('demo', r.id, { body: { v: 1, content: [] }, base: r.updated }, 'user').body).toBeNull();
+        const dirty = store.saveDraft('demo', r.id, { body: { v: 1, content: [{ type: 'script', content: [{ type: 'text', text: 'x' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'ok' }] }] }, base: r.updated }, 'user');
+        expect(JSON.stringify(dirty.body)).not.toContain('script');
+        expect(docToText(dirty.body)).toContain('ok');
+    });
+
+    it('refuses what is not a draft of a record', () => {
+        const r = store.createRecord('demo', { type: 'note', title: 'N' }, 'user');
+        expect(status(() => store.saveDraft('demo', 'missing1', { body: null, base: 'x' }, 'user'))).toBe(404);
+        expect(status(() => store.saveDraft('demo', '../x', { body: null, base: 'x' }, 'user'))).toBe(400);
+        expect(status(() => store.saveDraft('demo', r.id, { base: r.updated }, 'user'))).toBe(400); // no body
+        expect(status(() => store.saveDraft('demo', r.id, { body: null, base: 42 }, 'user'))).toBe(400);
+        expect(status(() => store.draft('demo', '../x'))).toBe(400);
+        expect(status(() => store.draft('nope', r.id))).toBe(404);
+        // a file in drafts/ that Axis did not write is not a draft
+        mkdirSync(join(root, 'demo', 'drafts'), { recursive: true });
+        writeFileSync(join(root, 'demo', 'drafts', 'ghost.json'), '{ not json');
+        writeFileSync(join(root, 'demo', 'drafts', 'nobase.json'), JSON.stringify({ body: null }));
+        expect(store.drafts('demo')).toEqual([]);
+    });
+
+    it('goes to the trash with its record', () => {
+        const area = store.createRecord('demo', { type: 'area', title: 'A' }, 'user');
+        const t = store.createRecord('demo', { type: 'task', title: 'T', parent: area.id }, 'user');
+        const keep = store.createRecord('demo', { type: 'note', title: 'Keep' }, 'user');
+        store.saveDraft('demo', area.id, { body: paragraph('a'), base: area.updated }, 'user');
+        store.saveDraft('demo', t.id, { body: paragraph('t'), base: t.updated }, 'user');
+        store.saveDraft('demo', keep.id, { body: paragraph('k'), base: keep.updated }, 'user');
+        store.deleteRecord('demo', area.id, 'user');
+        expect(store.drafts('demo')).toEqual([keep.id]);
+        // moved, not erased: beside the records in the trash
+        expect(existsSync(join(root, 'demo', 'trash', `${area.id}.draft.json`))).toBe(true);
+        expect(existsSync(join(root, 'demo', 'trash', `${t.id}.draft.json`))).toBe(true);
+        expect(existsSync(join(root, 'demo', 'drafts', `${t.id}.json`))).toBe(false);
+    });
+
+    it('refuses a save made against an older version, with the record as it is now', () => {
+        const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'old' }, 'user');
+        const base = r.updated;
+        // the page saves against the base of its draft: the record has not moved, so it goes through
+        const ok = store.updateRecord('demo', r.id, { body: paragraph('mine'), base }, 'user');
+        expect(docToText(ok.body)).toBe('mine');
+        expect(store.journal('demo')[0]).toMatchObject({ kind: 'update', changes: { body: ['', ''] } });
+
+        // somebody else (Claude through MCP: no base) changed the text meanwhile
+        const theirs = store.updateRecord('demo', r.id, { text: 'theirs' }, 'claude');
+        const lines = store.journal('demo').length;
+        let refused: unknown;
+        try {
+            store.updateRecord('demo', r.id, { body: paragraph('mine again'), base: ok.updated }, 'user');
+        } catch (error) {
+            refused = error;
+        }
+        expect(refused).toBeInstanceOf(AxisError);
+        expect((refused as AxisError).status).toBe(409);
+        expect((refused as AxisError).data).toEqual({ record: theirs });
+        // nothing was written: neither the record nor the journal
+        expect(docToText(store.record('demo', r.id).body)).toBe('theirs');
+        expect(store.journal('demo')).toHaveLength(lines);
+
+        // "overwrite with mine": the same save with the new base
+        const forced = store.updateRecord('demo', r.id, { body: paragraph('mine again'), base: theirs.updated }, 'user');
+        expect(docToText(forced.body)).toBe('mine again');
+        // callers that send no base (MCP) are never refused
+        expect(docToText(store.updateRecord('demo', r.id, { text: 'from mcp' }, 'claude').body)).toBe('from mcp');
+        expect(status(() => store.updateRecord('demo', r.id, { body: null, base: 7 }, 'user'))).toBe(400);
     });
 });
 

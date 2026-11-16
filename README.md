@@ -18,10 +18,10 @@ npm run typecheck
 
 ## What it does
 
-- **The tree of a project.** An area gathers records into a branch and shows its progress (tasks done out of all, dropped ones do not count). A click on the circle of a task moves it round: not started, in work, done. A row shows the due date (red when late), whether there is a text and pictures, and a "C" mark when Claude edited the record last.
-- **Board.** The same records in four columns by status (not started, in work, done, dropped): what is in work right now and what is next. A card shows the type, the title, the areas above it, the due date and the "C" mark. Drag a card to another column or use the menu on the card (it names the statuses with the words of the record's type); a click opens the record in a drawer on the right. Filters by type (tasks and questions by default) and by branch are kept per project.
+- **The tree of a project.** An area gathers records into a branch and shows its progress (tasks done out of all, dropped ones do not count). A click on the circle of a task moves it round: not started, in work, done. A row shows the due date (red when late), whether there is a text and pictures, a pencil when the text has an unsaved draft, and a "C" mark when Claude edited the record last.
+- **Board.** The same records in four columns by status (not started, in work, done, dropped): what is in work right now and what is next. A card shows the type, the title, the areas above it, the due date, the draft pencil and the "C" mark. Drag a card to another column or use the menu on the card (it names the statuses with the words of the record's type); a click opens the record in a drawer on the right. Filters by type (tasks and questions by default) and by branch are kept per project.
 - **Quick input.** The field under the tree: a line and `Enter`. A mark at the start sets the type: `?` question, `!` decision, `*` idea, `#` area, `-` task, `~` note; a word works too (`idea: …`, `todo: …`). The record lands in the selected area or right after the selected record, so a list is typed top to bottom.
-- **A record.** Title, type, status (each type has its own words: a decision is "Accepted", a question is "Answered"), due date, a text in the editor with headings, lists, tables and code. There is no Save button: a change goes by itself.
+- **A record.** Title, type, status (each type has its own words: a decision is "Accepted", a question is "Answered"), due date, a text with headings, lists, tables and code. Type, status, due date, links and pictures are saved at once, the title when you leave the field. The text is shown for reading (a long one is cut to about 12 lines with "Show more"); "Edit" (or a double click, or Enter on the text) opens the editor, and what you type is kept as a **draft** on the server, not in the record and not in the journal, until you press "Save" (`Ctrl+Enter`: one journal line) or "Cancel" (it asks first when the draft differs). A draft is not lost by a reload, another record, another view or a closed drawer: the record opens in editing with the draft, and the tree row and the board card carry a small pencil. If the text was changed meanwhile (by Claude, in another tab, by hand), the page says so, "Save" is refused, and a window shows the new text beside the choice: overwrite with mine, keep editing, take the new one. Nothing is merged for you.
 - **Pictures.** Paste from the clipboard (`Ctrl+V`), drop, or the button. A file is named by the hash of its content, so the same picture is stored once.
 - **Links.** "Depends on", "because of", "relates to"; a record shows both the outgoing and the incoming ones.
 - **The journal.** Every change: who (you or Claude), what, when and why; plus free notes on the whole project or on a record. Append-only.
@@ -37,9 +37,13 @@ One folder for all projects. The order of the choice: the `AXIS_DATA` variable, 
 <data>/<project>/project.json
 <data>/<project>/records/<id>.json     one record per file
 <data>/<project>/journal.jsonl         a line per change
+<data>/<project>/drafts/<id>.json          an unsaved text of a record: { body, base, at, by }
 <data>/<project>/assets/<hash>.png     pictures
 <data>/<project>/trash/<id>.json       what was deleted (nothing is erased)
+<data>/<project>/trash/<id>.draft.json the draft of a deleted record
 ```
+
+A draft is one file per record and is not in the journal. `base` is the `updated` stamp of the record when editing started: if the record has a newer one when the text is saved, the server answers 409 with the current record (a caller that sends no `base`, like the MCP server, is not checked). Over HTTP: `GET`, `PUT` (`{ body, base }`) and `DELETE` on `/api/projects/<project>/records/<id>/draft`; the project load lists the ids that have a draft (`drafts`). Claude does not see drafts, only saved text.
 
 The files can be read and edited by hand, put in git and moved. A record with a mistake inside does not break the project: it is made valid or skipped.
 
@@ -51,7 +55,7 @@ The MCP server works on the same files, so the page does not have to be running.
 claude mcp add axis --scope user -- node E:/job/git/app-axis/server/mcp.ts
 ```
 
-Tools: `axis_projects`, `axis_create_project`, `axis_overview` (a project as an outline), `axis_read` (a record in full with its journal), `axis_add`, `axis_update`, `axis_link`, `axis_delete`, `axis_journal`, `axis_log` (a note to the journal), `axis_search`. Claude writes and reads the text of a record as plain text with light Markdown; `src/core/text.ts` turns it into the stored document of the editor. Changes take a `why` field: the reason goes to the journal.
+Tools: `axis_projects`, `axis_create_project`, `axis_overview` (a project as an outline), `axis_read` (a record in full with its journal), `axis_add`, `axis_update`, `axis_link`, `axis_delete`, `axis_journal`, `axis_log` (a note to the journal), `axis_search`. Claude writes and reads the text of a record as plain text with light Markdown; TaoEditor's Markdown functions (`markdownToDoc`, `docToMarkdown`, wrapped in `src/core/text.ts`) turn it into the stored document of the editor and back. Changes take a `why` field: the reason goes to the journal.
 
 The same access exists over HTTP (`/api/projects/…`, the header `X-Axis-By: claude`), and Claude can open the page and look at it in the built-in browser.
 
@@ -63,14 +67,14 @@ server/       the file store, the HTTP API with an event stream, the standalone 
 src/app/      the state of the page, the API client, live updates, the address
 src/ui/       the tree with quick input, the board, a record, the journal, the new project window
 src/i18n/     dictionaries ru / en
-tests/        the core and the store (on a temporary folder)
+tests/        the core, the store and the HTTP API (on a temporary folder)
 ```
 
 The server answers this machine only: it listens on `127.0.0.1`, refuses a foreign `Host` or `Origin`, and takes changes only as JSON.
 
 ## Not yet
 
-A timeline and a map on a canvas (views of the same data). Dragging records in the tree with the mouse (for now "Move up", "Move down", "One level up" in the row menu). Pictures inside the text. Undo. Access from another device. Checked by hand in Chromium; Firefox, Safari, touch screens and a narrow screen are not checked. There are no tests of the page components yet, only of the core and the store.
+A timeline and a map on a canvas (views of the same data). Dragging records in the tree with the mouse (for now "Move up", "Move down", "One level up" in the row menu). Pictures inside the text. Undo. Access from another device. Checked by hand in Chromium; Firefox, Safari, touch screens and a narrow screen are not checked. There are no tests of the page components yet, only of the core, the store and the HTTP API.
 
 ## License
 

@@ -9,7 +9,7 @@
 import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoSelect, TaoTree, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
-import { addRecord, countInside, moveStep, outdent, patchRecord, recordById, removeRecord, select, state, tree } from '@/app/state';
+import { addRecord, countInside, hasDraft, moveStep, outdent, patchRecord, recordById, removeRecord, select, state, tree } from '@/app/state';
 import { RECORD_TYPES } from '@/core/model';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
@@ -178,6 +178,7 @@ async function add(): Promise<void> {
                         <span v-if="r" class="row" :class="{ 'row--closed': r.record.status === 'done' || r.record.status === 'dropped', 'row--dropped': r.record.status === 'dropped', 'row--area': r.record.type === 'area' }">
                             <span class="row__title">{{ r.record.title }}</span>
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
+                            <TaoIcon v-if="hasDraft(r.record.id)" class="row__mark row__draft" name="tao-edit" :title="t('tree.hasDraft')" />
                             <TaoIcon v-if="r.record.images.length > 0" class="row__mark" name="image" />
                             <span v-if="r.record.updatedBy === 'claude'" class="row__claude" :title="t('tree.byClaude')">C</span>
                             <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': isOverdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
@@ -295,6 +296,11 @@ async function add(): Promise<void> {
     flex: none;
     color: var(--tao-color-text-muted);
     font-size: 13px;
+}
+
+/* an unsaved draft of the text: a quiet pencil, in the colour of the selection accent so it is not lost among the grey marks / набросок текста: тихий карандаш */
+.row__draft {
+    color: var(--tao-color-info);
 }
 
 .row__claude {

@@ -65,6 +65,23 @@ export interface AxisRecord {
     updatedBy: Author;
 }
 
+/**
+ * A draft of the text of a record: what is being typed and not yet saved to the record. One per record,
+ * `drafts/<recordId>.json`. It is not in the journal and not in the record until the person presses Save.
+ * `base` is the `updated` stamp of the record at the moment editing started: the version the draft was written against.
+ *
+ * Черновик текста записи: то, что печатается и ещё не сохранено в запись. Один на запись, `drafts/<id записи>.json`.
+ * В журнале и в записи его нет, пока человек не нажмёт «Сохранить». `base` — штамп `updated` записи в момент начала
+ * правки: версия, против которой писался черновик.
+ */
+export interface AxisDraft {
+    body: Doc | null;
+    base: string;
+    /** When the draft was last written, ISO. / Когда черновик записан в последний раз. */
+    at: string;
+    by: Author;
+}
+
 export interface AxisProject {
     v: 1;
     /** Also the folder name. / Оно же имя папки. */
