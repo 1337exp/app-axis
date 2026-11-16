@@ -24,6 +24,7 @@ npm run typecheck
 - **Pictures.** Paste from the clipboard (`Ctrl+V`), drop, or the button. A file is named by the hash of its content, so the same picture is stored once.
 - **Links.** "Depends on", "because of", "relates to"; a record shows both the outgoing and the incoming ones.
 - **The journal.** Every change: who (you or Claude), what, when and why; plus free notes on the whole project or on a record. Append-only.
+- **Status bar.** One thin line at the bottom: the progress of the open project, tasks done out of all, tasks in work, open questions. On a narrow window the less important counts drop out.
 - **Live.** The server watches the data folder: a change by Claude, from another tab or by hand in a file shows on the page by itself.
 - Russian and English, light and dark themes, the address of a record in the address bar (`#/project/record`).
 

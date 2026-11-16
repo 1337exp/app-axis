@@ -1,21 +1,21 @@
 <script setup lang="ts">
 /**
- * The shell: the header (which project, how far it is, which view) and under it the tree beside the open record,
- * or the journal.
+ * The shell: the header (which project, which view) and under it the tree beside the open record,
+ * or the journal; at the bottom the status bar with the progress.
  *
- * Оболочка: шапка (какой проект, насколько он продвинулся, какой вид) и под ней дерево рядом с открытой записью
- * или журнал.
+ * Оболочка: шапка (какой проект, какой вид) и под ней дерево рядом с открытой записью
+ * или журнал; внизу строка состояния с прогрессом.
  */
 import { TaoAlert, TaoButton, TaoEmpty, TaoLoader, TaoSegmented, TaoSegmentedOption, TaoSelect, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
 import { computed, ref, watch } from 'vue';
-import { openProject, progress, setView, start, state } from '@/app/state';
+import { openProject, setView, start, state } from '@/app/state';
 import type { View } from '@/app/state';
-import { percent } from '@/core/tree';
 import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
 import JournalPane from '@/ui/JournalPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
 import RecordPane from '@/ui/RecordPane.vue';
+import StatusBar from '@/ui/StatusBar.vue';
 import TreePane from '@/ui/TreePane.vue';
 
 const { t } = useI18n();
@@ -35,7 +35,6 @@ const view = computed({
     set: (value: View) => setView(value),
 });
 
-const share = computed(() => percent(progress.value));
 const localeOptions = codes.map((value) => ({ value, label: LOCALE_NAMES[value] }));
 const locale = computed({
     get: () => current.value,
@@ -56,18 +55,6 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
             <strong class="bar__name">Axis</strong>
             <TaoSelect v-if="state.projects.length > 0" v-model="projectId" class="bar__project" :options="projectOptions" :clearable="false" :aria-label="t('project.choose')" />
             <TaoButton variant="ghost" tone="neutral" icon="tao-plus" :aria-label="t('project.create')" :title="t('project.create')" @click="creating = true" />
-
-            <div v-if="state.project" class="bar__progress" :title="progress.total > 0 ? `${share}%` : ''">
-                <template v-if="progress.total > 0">
-                    <span class="bar__track" role="progressbar" :aria-valuenow="share" aria-valuemin="0" aria-valuemax="100" :aria-label="t('project.tasks', [progress.done, progress.total])">
-                        <span class="bar__fill" :style="{ width: `${share}%` }"></span>
-                    </span>
-                    <span class="bar__count">{{ t('project.tasks', [progress.done, progress.total]) }}</span>
-                    <span v-if="progress.active > 0" class="bar__extra">{{ t('project.active', [progress.active]) }}</span>
-                </template>
-                <span v-else class="bar__extra">{{ t('project.noTasks') }}</span>
-                <span v-if="progress.questions > 0" class="bar__extra">{{ t('project.questions', [progress.questions]) }}</span>
-            </div>
 
             <span class="bar__space"></span>
 
@@ -101,6 +88,8 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
             </TaoSplit>
         </main>
 
+        <StatusBar />
+
         <NewProjectDialog v-model="creating" />
     </div>
 </template>
@@ -132,40 +121,6 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
 
 .bar__project {
     width: 220px;
-}
-
-.bar__progress {
-    display: flex;
-    align-items: center;
-    gap: var(--tao-space-3);
-    margin-left: var(--tao-space-3);
-    min-width: 0;
-    font-size: var(--tao-font-size-sm);
-    white-space: nowrap;
-}
-
-.bar__track {
-    width: 120px;
-    height: 6px;
-    border-radius: var(--tao-radius-full);
-    background: var(--tao-color-surface-sunken);
-    overflow: hidden;
-}
-
-.bar__fill {
-    display: block;
-    height: 100%;
-    background: var(--tao-color-success);
-    transition: width 0.3s ease;
-}
-
-.bar__count {
-    color: var(--tao-color-text-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-.bar__extra {
-    color: var(--tao-color-text-muted);
 }
 
 .bar__space {
@@ -206,12 +161,6 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
 @media (max-width: 900px) {
     .bar {
         flex-wrap: wrap;
-    }
-
-    .bar__progress {
-        order: 10;
-        width: 100%;
-        margin-left: 0;
     }
 }
 </style>

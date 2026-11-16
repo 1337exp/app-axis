@@ -412,12 +412,23 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
     align-items: flex-start;
     gap: var(--tao-space-3);
     margin-top: var(--tao-space-2);
+    /* the line box of the title, so the mark can be centred on its first line / строка заголовка, по ней центруем отметку */
+    --title-line: calc(var(--tao-font-size-2xl) * 1.25);
 }
 
+/*
+ * The mark is a box as tall as one title line, pushed down by the textarea's own top padding, and the icon is
+ * centred in it: it stays on the first line however many lines the title wraps to.
+ * Отметка: коробка высотой в одну строку заголовка, опущенная на верхний padding textarea, иконка по центру;
+ * при переносе заголовка остаётся у первой строки.
+ */
 .record__mark {
     flex: none;
     display: inline-flex;
-    margin-top: 7px;
+    align-items: center;
+    justify-content: center;
+    height: var(--title-line);
+    margin-top: var(--tao-control-padding-y);
     font-size: 22px;
     color: var(--tao-color-text-muted);
 }
@@ -431,8 +442,22 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 .record__title :deep(textarea) {
     font-size: var(--tao-font-size-2xl);
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.25; /* keep in step with --title-line / в паре с --title-line */
     color: var(--tao-color-text-strong);
+}
+
+/*
+ * Tighter lines for short working notes. The editor sits under `tao-prose`, which sets its own line height and
+ * ignores `--te-line-height`, so the variable is set here and read by the text explicitly; margins stay as they are.
+ * Строки теснее для коротких рабочих заметок. Редактор под `tao-prose`, а тот задаёт свою высоту строки и
+ * `--te-line-height` не читает: переменная задана здесь и читается текстом явно; отступы не трогаем.
+ */
+.record__text {
+    --te-line-height: 1.45;
+}
+
+.record__text :deep(.tao-prose) {
+    line-height: var(--te-line-height);
 }
 
 .record__props {
