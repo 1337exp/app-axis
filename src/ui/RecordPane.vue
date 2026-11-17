@@ -489,17 +489,15 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
     <TaoEmpty v-if="!record" class="record-empty" :title="t('record.none')">{{ t('record.noneText') }}</TaoEmpty>
 
     <article v-else class="record" @paste="onPaste" @dragover.prevent @drop="onDrop">
-        <header class="record__head">
-            <nav class="record__path" aria-label="Path">
-                <template v-for="step in path" :key="step.id">
-                    <button type="button" class="record__step" @click="select(step.id)">{{ step.title }}</button>
-                    <span aria-hidden="true">/</span>
-                </template>
-            </nav>
-            <span class="record__saved" role="status">{{ saveState === 'saving' ? t('record.saving') : saveState === 'saved' ? t('record.saved') : '' }}</span>
-            <TaoButton variant="ghost" tone="neutral" icon="tao-trash" :aria-label="t('record.remove')" :title="t('record.remove')" @click="remove" />
-        </header>
+        <!-- the sections above the record: a row of its own, only when there are some (no height reserved otherwise) / разделы над записью: своя строка, только когда они есть (иначе высоты не занимает) -->
+        <nav v-if="path.length > 0" class="record__path" aria-label="Path">
+            <template v-for="step in path" :key="step.id">
+                <button type="button" class="record__step" @click="select(step.id)">{{ step.title }}</button>
+                <span aria-hidden="true">/</span>
+            </template>
+        </nav>
 
+        <!-- the header: the mark, the title (takes the free width, may wrap) and the delete button, top aligned / шапка: отметка, заголовок (занимает свободную ширину, может переноситься) и кнопка удаления, по верхнему краю -->
         <div class="record__titlerow">
             <span class="record__mark" :class="toneClass(record)"><TaoIcon :name="recordIcon(record)" /></span>
             <TaoTextarea
@@ -513,6 +511,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                 :aria-label="t('record.title')"
                 @blur="saveTitle"
             />
+            <TaoButton class="record__remove" variant="ghost" tone="neutral" icon="tao-trash" :aria-label="t('record.remove')" :title="t('record.remove')" @click="remove" />
         </div>
 
         <div class="record__props">
@@ -523,10 +522,13 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                 </TaoSegmentedOption>
             </TaoSegmented>
             <TaoDate v-model="due" class="record__due" :placeholder="t('record.due')" :today-text="t('record.today')" :clear-text="t('record.dueClear')" :aria-label="t('record.due')" />
-            <template v-if="record.type === 'task'">
-                <label class="record__exec"><span class="record__exec-label">{{ t('exec.executor') }}</span><TaoSelect v-model="execModel" :options="modelOptions" :clearable="false" size="small" :aria-label="t('exec.executor')" /></label>
-                <label class="record__exec"><span class="record__exec-label">{{ t('exec.effort') }}</span><TaoSelect v-model="execEffort" :options="effortOptions" :clearable="false" size="small" :aria-label="t('exec.effort')" /></label>
-            </template>
+            <span class="record__saved" role="status">{{ saveState === 'saving' ? t('record.saving') : saveState === 'saved' ? t('record.saved') : '' }}</span>
+        </div>
+
+        <!-- the recommended executor of a task: a block of its own, below the status and the due date / рекомендованный исполнитель задачи: свой блок под статусом и сроком -->
+        <div v-if="record.type === 'task'" class="record__execs">
+            <label class="record__exec"><span class="record__exec-label">{{ t('exec.executor') }}</span><TaoSelect v-model="execModel" :options="modelOptions" :clearable="false" size="small" :aria-label="t('exec.executor')" /></label>
+            <label class="record__exec"><span class="record__exec-label">{{ t('exec.effort') }}</span><TaoSelect v-model="execEffort" :options="effortOptions" :clearable="false" size="small" :aria-label="t('exec.effort')" /></label>
         </div>
 
         <section class="block block--text">
@@ -652,22 +654,15 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
     padding: var(--tao-space-3) var(--tao-space-5) var(--tao-space-8);
 }
 
-.record__head {
-    display: flex;
-    align-items: center;
-    gap: var(--tao-space-2);
-    min-height: 36px;
-    color: var(--tao-color-text-muted);
-    font-size: var(--tao-font-size-sm);
-}
-
 .record__path {
-    flex: 1;
     min-width: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
+    margin-bottom: var(--tao-space-2);
+    color: var(--tao-color-text-muted);
+    font-size: var(--tao-font-size-sm);
 }
 
 .record__step {
@@ -685,14 +680,20 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 
 .record__saved {
     flex: none;
+    margin-left: auto;
+    color: var(--tao-color-text-muted);
     font-size: var(--tao-font-size-xs);
+}
+
+/* the delete button keeps its size and stays at the top of the row, beside the first line of the title / кнопка удаления не сжимается и стоит вверху строки, у первой строки заголовка */
+.record__remove {
+    flex: none;
 }
 
 .record__titlerow {
     display: flex;
     align-items: flex-start;
     gap: var(--tao-space-3);
-    margin-top: var(--tao-space-2);
     /* the line box of the title, so the mark can be centred on its first line / строка заголовка, по ней центруем отметку */
     --title-line: calc(var(--tao-font-size-2xl) * 1.25);
 }
@@ -754,6 +755,14 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 
 .record__due {
     width: 170px;
+}
+
+.record__execs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--tao-space-2) var(--tao-space-4);
+    margin: 0 0 var(--tao-space-4);
 }
 
 .record__exec {
