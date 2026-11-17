@@ -13,6 +13,7 @@ import { useI18n } from '@/i18n';
 import { fold } from '@/core/search';
 import JournalList from './JournalList.vue';
 import SearchEmpty from './SearchEmpty.vue';
+import SearchField from './SearchField.vue';
 
 const { t } = useI18n();
 const entries = ref<JournalEntry[]>([]);
@@ -58,6 +59,7 @@ async function add(): Promise<void> {
 
 <template>
     <section class="journal-pane">
+        <SearchField class="journal-pane__search" wide />
         <form class="journal-pane__note" @submit.prevent="add">
             <TaoTextarea v-model="note" variant="outline" :rows="2" :max-height="200" :placeholder="t('journal.notePlaceholder')" :aria-label="t('journal.note')" @keydown.ctrl.enter="add" @keydown.meta.enter="add" />
             <TaoButton type="submit" variant="secondary" :disabled="note.trim() === ''" :loading="busy">{{ t('journal.add') }}</TaoButton>
@@ -69,6 +71,10 @@ async function add(): Promise<void> {
 </template>
 
 <style scoped>
+.journal-pane__search {
+    margin-bottom: var(--tao-space-4);
+}
+
 .journal-pane {
     max-width: 860px;
     margin: 0 auto;

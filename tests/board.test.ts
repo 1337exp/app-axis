@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BOARD_STATUSES, BOARD_TYPES, DEFAULT_BOARD_TYPES, groupByStatus } from '../src/core/board.ts';
 import type { AxisRecord } from '../src/core/model.ts';
-import { defaultFilter, readFilter, writeFilter } from '../src/app/viewFilter.ts';
+import { defaultFilter, readFilter, readIds, writeFilter, writeIds } from '../src/app/viewFilter.ts';
 
 const NOW = '2026-11-16T10:00:00.000Z';
 
@@ -145,5 +145,29 @@ describe('saved filter of the board', () => {
         };
         expect(readFilter('board', 'p', broken)).toEqual(defaultFilter());
         expect(() => writeFilter('board', 'p', defaultFilter(), broken)).not.toThrow();
+    });
+});
+
+describe('the closed branches of the tree', () => {
+    const memory = () => {
+        const data: Record<string, string> = {};
+        return { getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => void (data[k] = v) };
+    };
+
+    it('are kept per project and read back', () => {
+        const store = memory();
+        writeIds('tree.closed', 'p', ['a1', 'b2'], store);
+        expect(readIds('tree.closed', 'p', store)).toEqual(['a1', 'b2']);
+        expect(readIds('tree.closed', 'other', store)).toEqual([]);
+    });
+
+    it('are empty when nothing is saved, the value is broken or the storage is shut', () => {
+        expect(readIds('tree.closed', 'p', memory())).toEqual([]);
+        expect(readIds('tree.closed', 'p', { getItem: () => '{oops', setItem: () => undefined })).toEqual([]);
+        expect(readIds('tree.closed', 'p', { getItem: () => '{"a":1}', setItem: () => undefined })).toEqual([]);
+        expect(readIds('tree.closed', 'p', { getItem: () => JSON.stringify(['ok', 'Bad Id!', 3]), setItem: () => undefined })).toEqual(['ok']);
+        const shut = { getItem: () => { throw new Error('no'); }, setItem: () => { throw new Error('no'); } };
+        expect(readIds('tree.closed', 'p', shut)).toEqual([]);
+        expect(() => writeIds('tree.closed', 'p', ['a'], shut)).not.toThrow();
     });
 });

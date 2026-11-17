@@ -7,6 +7,18 @@ body,
     margin: 0;
 }
 
+/*
+ * Softer corners than the TaoUI defaults (4 / 8 / 12), the way the NextUp mockups have them; everything of the app takes these tokens.
+ * Скругления мягче, чем по умолчанию в TaoUI (4 / 8 / 12), как в макетах NextUp; всё остальное в приложении берёт эти токены.
+ */
+:root {
+    --tao-radius-sm: 6px;
+    --tao-radius-md: 10px;
+    --tao-radius-lg: 14px;
+    --tao-radius-control: 10px;
+    --tao-radius-panel: 18px;
+}
+
 body {
     overflow: hidden;
     background: var(--tao-color-bg);

@@ -50,6 +50,26 @@ export function writeFilter(scope: ViewScope, projectId: string, filter: RecordF
     }
 }
 
+// ───────────────────────────── lists of ids / списки id
+// What the tree keeps: the branches the person closed (so a branch that is new starts open). / Что помнит дерево: ветки, которые человек закрыл (новая ветка начинает открытой).
+
+export function readIds(name: string, projectId: string, store?: Store): string[] {
+    try {
+        const raw = JSON.parse((store ?? localStorage).getItem(flagKey(name, projectId)) ?? '[]') as unknown;
+        return Array.isArray(raw) ? raw.filter(isId) : [];
+    } catch {
+        return [];
+    }
+}
+
+export function writeIds(name: string, projectId: string, ids: readonly string[], store?: Store): void {
+    try {
+        (store ?? localStorage).setItem(flagKey(name, projectId), JSON.stringify(ids));
+    } catch {
+        // see writeFilter
+    }
+}
+
 // ───────────────────────────── flags / флажки ─────────────────────────────
 // A switch of a view that is not a filter: "show done", "the backlog is open". One key per flag and per project.
 // Переключатель вида, который не фильтр: «показать готовое», «запас раскрыт». Один ключ на флажок и проект.

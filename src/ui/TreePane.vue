@@ -6,10 +6,12 @@
  * Дерево проекта и быстрый ввод под ним. Строка показывает, что это за запись, насколько она продвинулась
  * и кто трогал её последним; поле внизу превращает строку в запись, не отрывая рук от клавиатуры.
  */
-import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoTree, confirm, toast } from '@1337exp/taoui';
+import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoKbd, TaoTree, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { isFound, kept, query } from '@/app/search';
+import { ui } from '@/app/ui';
+import { readIds, writeIds } from '@/app/viewFilter';
 import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
@@ -21,6 +23,7 @@ import ClaudeMark from './ClaudeMark.vue';
 import { formatShort } from './format';
 import { isOverdue } from './marks';
 import SearchEmpty from './SearchEmpty.vue';
+import SearchField from './SearchField.vue';
 import StatusMark from './StatusMark.vue';
 import TypeSelect from './TypeSelect.vue';
 
@@ -89,13 +92,25 @@ function pieces(title: string): { text: string; hit: boolean }[] {
     return out;
 }
 
-// every branch starts open; after that the user decides, and a branch that gets a child opens
+// every branch starts open; after that the user decides, and a branch that gets a child opens.
+// What the person closed is kept per project (`localStorage`): a branch that is new is not in the list, so it starts open.
+// Каждая ветка начинает открытой; дальше решает человек, а ветка, получившая ребёнка, открывается.
+// Закрытое человеком помнится по проектам (`localStorage`): новой ветки в списке нет, поэтому она начинает открытой.
 const expanded = ref<string[]>([]);
+const branchIds = (): string[] => [...nodeById.value.values()].filter((n) => n.children.length > 0).map((n) => n.record.id);
 watch(
     () => state.projectId,
-    () => (expanded.value = [...nodeById.value.values()].filter((n) => n.children.length > 0).map((n) => n.record.id)),
+    (id) => {
+        const closed = new Set(readIds('tree.closed', id));
+        expanded.value = branchIds().filter((branch) => !closed.has(branch));
+    },
     { immediate: true },
 );
+watch(expanded, (open) => {
+    if (!state.projectId || nodeById.value.size === 0) return;
+    const now = new Set(open);
+    writeIds('tree.closed', state.projectId, branchIds().filter((branch) => !now.has(branch)));
+});
 const open = (id: string): void => {
     if (!expanded.value.includes(id)) expanded.value = [...expanded.value, id];
 };
@@ -158,6 +173,11 @@ const line = ref('');
 const type = ref<RecordType>('task');
 const quick = ref<HTMLElement | null>(null);
 const focusQuick = (): void => quick.value?.querySelector('input')?.focus();
+// "New record" in the navigation: the focus goes to the quick input / «Запись» в навигации: фокус уходит в быстрый ввод
+watch(
+    () => ui.quick,
+    () => void nextTick(focusQuick),
+);
 
 /** "Add inside" pins the parent until the selection moves elsewhere. / «Добавить внутрь» закрепляет родителя, пока выбор не уйдёт. */
 const target = ref<string | null>(null);
@@ -202,6 +222,7 @@ async function add(): Promise<void> {
 
 <template>
     <section class="tree-pane">
+        <div class="tree-pane__search"><SearchField wide /></div>
         <div class="tree-pane__scroll">
             <SearchEmpty v-if="nodes.length === 0 && kept" />
             <TaoEmpty v-else-if="nodes.length === 0" :title="t('tree.empty')">{{ t('tree.emptyText') }}</TaoEmpty>
@@ -243,10 +264,12 @@ async function add(): Promise<void> {
 
         <form ref="quick" class="quick" @submit.prevent="add">
             <div class="quick__row">
-                <TaoInput v-model="line" class="quick__input" :placeholder="t('quick.placeholder')" :aria-label="t('quick.placeholder')" autocomplete="off" />
+                <TypeSelect v-model="type" class="quick__type" :aria-label="t('quick.type')" />
+                <TaoInput v-model="line" class="quick__input" :placeholder="t('quick.placeholder')" :aria-label="t('quick.placeholder')" autocomplete="off">
+                    <template #suffix><TaoKbd class="quick__key" aria-hidden="true">Enter</TaoKbd></template>
+                </TaoInput>
                 <TaoButton type="submit" icon="tao-plus" :aria-label="t('quick.add')" :disabled="!parsed" />
             </div>
-            <TypeSelect v-model="type" class="quick__type" :aria-label="t('quick.type')" />
             <p class="quick__hint">
                 <template v-if="parsed">
                     <strong>{{ t(`type.${parsed.type}`) }}</strong> {{ placeText }}
@@ -263,6 +286,11 @@ async function add(): Promise<void> {
     flex-direction: column;
     height: 100%;
     min-height: 0;
+}
+
+.tree-pane__search {
+    flex: none;
+    padding: var(--tao-space-2) var(--tao-space-2) 0;
 }
 
 .tree-pane__scroll {
@@ -367,6 +395,8 @@ async function add(): Promise<void> {
 }
 
 .quick {
+    /* the layout answers to the width of the pane, not of the window / раскладка отвечает ширине панели, а не окна */
+    container-type: inline-size;
     flex: none;
     padding: var(--tao-space-3);
     border-top: 1px solid var(--tao-color-border);
@@ -380,13 +410,21 @@ async function add(): Promise<void> {
 }
 
 .quick__type {
+    flex: none;
     width: 148px;
-    margin-top: var(--tao-space-2);
 }
 
 .quick__input {
-    flex: 1 1 110px;
+    flex: 1 1 0;
     min-width: 0;
+}
+
+/* a narrow pane: the type select goes on top, the field and the button share the row below / узкая панель: выбор типа сверху, поле и кнопка делят строку под ним */
+@container (max-width: 400px) {
+    .quick__type {
+        flex: 1 0 100%;
+        width: auto;
+    }
 }
 
 .quick__hint {

@@ -46,6 +46,13 @@ const en: typeof ru = {
         none: 'Nothing found',
         noneText: 'The search looks in the titles and the text of records. A mark at the start (? question, ! decision, * idea, - task, ~ note) looks for that type only.',
     },
+    nav: {
+        label: 'Sections',
+        newRecord: 'Record',
+        newRecordTitle: 'New record',
+        collapse: 'Collapse the menu',
+        expand: 'Expand the menu',
+    },
     view: {
         label: 'View',
         tree: 'Tree',
@@ -103,7 +110,7 @@ const en: typeof ru = {
         hasDraft: 'Has an unsaved draft of the text',
     },
     quick: {
-        placeholder: 'What to add? Enter saves',
+        placeholder: 'What to add?',
         type: 'Type of the new record',
         add: 'Add',
         into: 'into "{0}"',
@@ -237,6 +244,7 @@ const en: typeof ru = {
             links: 'links',
             images: 'pictures',
         },
+        yes: 'yes',
         was: 'was "{0}"',
         today: 'Today',
         yesterday: 'Yesterday',

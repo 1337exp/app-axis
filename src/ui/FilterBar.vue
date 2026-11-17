@@ -12,6 +12,7 @@ import { FILTER_TYPES } from '@/core/filter';
 import type { RecordType } from '@/core/model';
 import { useI18n } from '@/i18n';
 import { typeIcon } from './marks';
+import SearchField from './SearchField.vue';
 
 defineProps<{
     typeOn: (type: RecordType) => boolean;
@@ -44,6 +45,7 @@ const { t } = useI18n();
             </TaoButton>
         </div>
         <slot />
+        <SearchField class="filter-bar__search" fold />
         <TaoSelect v-model="root" class="filter-bar__branch" :options="areaOptions" :clearable="false" :aria-label="t('filter.branch')" />
     </div>
 </template>
@@ -73,10 +75,13 @@ const { t } = useI18n();
     width: 170px;
 }
 
+.filter-bar__search {
+    margin-left: auto;
+}
+
 .filter-bar__branch {
     width: 240px;
     max-width: 100%;
-    margin-left: auto;
 }
 
 /* a narrow window: the types are icons only (the words stay in the tooltip and for screen readers), the branch takes the rest of the row */

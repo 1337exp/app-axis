@@ -21,6 +21,10 @@ export function registerAppIcons(): void {
         board: { body: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>' },
         // a vertical axis with dated entries on it / вертикальная ось с датированными записями
         timeline: { body: '<path d="M6 3v18M11 6h9M11 12h9M11 18h6"/><circle cx="6" cy="6" r="1.8" fill="currentColor"/><circle cx="6" cy="12" r="1.8" fill="currentColor"/><circle cx="6" cy="18" r="1.8" fill="currentColor"/>' },
+        // the navigation: the language, the side panel folded and unfolded / навигация: язык, боковая панель свёрнута и развёрнута
+        language: { body: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>' },
+        'panel-close': { body: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M16 9l-3 3 3 3"/>' },
+        'panel-open': { body: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M13 9l3 3-3 3"/>' },
         // a map: cards joined by lines / карта: карточки, соединённые линиями
         map: { body: '<rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/><path d="M10 6.5h2.5a1.5 1.5 0 0 1 1.5 1.5v0M10 6.5h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 0"/>' },
         fit: { body: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="9" y="9" width="6" height="6" rx="1"/>' },

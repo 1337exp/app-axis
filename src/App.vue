@@ -1,15 +1,21 @@
 <script setup lang="ts">
 /**
- * The shell: the header (which project, which view) and under it the tree beside the open record,
- * the board by status or the timeline by due dates over the whole width, or the journal; at the bottom the status bar
- * with the progress.
+ * The shell: a navigation (`TaoNav`) with the views, the main action "New record", the project menu, the language and the
+ * theme, and beside it the page of the view: the tree beside the open record, the board, the timeline, the map or the
+ * journal; at the bottom the status bar. The navigation is a side panel with labels on a wide window, a rail of icons when
+ * it is folded or the window is narrower, and a bar at the bottom on a phone (there a thin header carries the project, the
+ * language and the theme, which the bar has no room for).
  *
- * Оболочка: шапка (какой проект, какой вид) и под ней дерево рядом с открытой записью,
- * доска по статусам или лента по срокам на всю ширину или журнал; внизу строка состояния с прогрессом.
+ * Оболочка: навигация (`TaoNav`) с видами, главным действием «Запись», меню проектов, языком и темой, а рядом страница
+ * вида: дерево рядом с открытой записью, доска, лента, карта или журнал; внизу строка состояния. Навигация это боковая
+ * панель с подписями на широком окне, рейка иконок, когда она свёрнута или окно уже, и панель снизу на телефоне (там
+ * тонкая шапка несёт проект, язык и тему, для которых в панели места нет).
  */
-import { TaoAlert, TaoButton, TaoEmpty, TaoLoader, TaoSegmented, TaoSegmentedOption, TaoSelect, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
-import { computed, ref, watch } from 'vue';
-import { openProject, setView, start, state } from '@/app/state';
+import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLoader, TaoNav, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
+import type { TaoMenuItem, TaoNavItem } from '@1337exp/taoui';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ui } from '@/app/ui';
+import { openProject, setView, start, state, progress } from '@/app/state';
 import type { View } from '@/app/state';
 import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
@@ -18,7 +24,6 @@ import JournalPane from '@/ui/JournalPane.vue';
 import MapPane from '@/ui/MapPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
 import RecordPane from '@/ui/RecordPane.vue';
-import SearchField from '@/ui/SearchField.vue';
 import StatusBar from '@/ui/StatusBar.vue';
 import TimelinePane from '@/ui/TimelinePane.vue';
 import TreePane from '@/ui/TreePane.vue';
@@ -29,22 +34,72 @@ const creating = ref(false);
 const split = ref(Number(localStorage.getItem('axis.split')) || 38);
 watch(split, (value) => localStorage.setItem('axis.split', String(Math.round(value))));
 
-const projectOptions = computed(() => state.projects.map((p) => ({ value: p.id, label: p.title })));
-const projectId = computed({
-    get: () => state.projectId || null,
-    set: (id: string | number | null) => typeof id === 'string' && id !== state.projectId && void openProject(id),
+// ───────────────────────────── navigation / навигация ─────────────────────────────
+
+/** A phone: the navigation is a bar at the bottom. / Телефон: навигация это панель снизу. */
+const narrow = ref(false);
+let query: MediaQueryList | null = null;
+const onQuery = (): void => {
+    narrow.value = query?.matches ?? false;
+};
+/** `N` is "New record" (shown on the button), when no field has the keys. / `N` это «Новая запись» (написано на кнопке), когда клавиши не заняты полем. */
+function onKey(event: KeyboardEvent): void {
+    if (event.code !== 'KeyN' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !state.project) return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+    event.preventDefault();
+    void newRecord();
+}
+onMounted(() => {
+    query = window.matchMedia('(max-width: 599px)');
+    onQuery();
+    query.addEventListener('change', onQuery);
+    window.addEventListener('keydown', onKey);
+});
+onBeforeUnmount(() => {
+    query?.removeEventListener('change', onQuery);
+    window.removeEventListener('keydown', onKey);
 });
 
-const view = computed({
-    get: () => state.view,
-    set: (value: View) => setView(value),
-});
+/** The person folded the side panel into a rail. / Человек свернул боковую панель в рейку. */
+const folded = ref(localStorage.getItem('axis.nav') === 'rail');
+watch(folded, (on) => localStorage.setItem('axis.nav', on ? 'rail' : 'wide'));
+const layout = computed(() => (!narrow.value && folded.value ? 'rail' : 'auto'));
 
-const localeOptions = codes.map((value) => ({ value, label: LOCALE_NAMES[value] }));
-const locale = computed({
-    get: () => current.value,
-    set: (code: LocaleCode) => setLocale(code),
-});
+const items = computed<TaoNavItem[]>(() => [
+    { id: 'tree', label: t('view.tree'), icon: 'tree' },
+    { id: 'board', label: t('view.board'), icon: 'board', ...(progress.value.active > 0 ? { badge: progress.value.active } : {}) },
+    { id: 'timeline', label: t('view.timeline'), icon: 'timeline' },
+    { id: 'map', label: t('view.map'), icon: 'map' },
+    { id: 'journal', label: t('view.journal'), icon: 'journal' },
+]);
+
+function onSelect(id: string): void {
+    setView(id as View);
+}
+
+/** "New record": the tree, with the focus in its quick input. / «Запись»: дерево с фокусом в быстром вводе. */
+async function newRecord(): Promise<void> {
+    setView('tree');
+    await nextTick();
+    ui.quick += 1;
+}
+
+// ───────────────────────────── projects, language / проекты, язык ─────────────────────────────
+
+const NEW = '*new';
+const projectItems = computed<TaoMenuItem[]>(() => [
+    ...state.projects.map((p): TaoMenuItem => ({ type: 'radio', id: p.id, group: 'project', label: p.title, checked: p.id === state.projectId })),
+    ...(state.projects.length > 0 ? [{ type: 'separator' } as TaoMenuItem] : []),
+    { id: NEW, label: t('project.create'), icon: 'tao-plus' },
+]);
+function onProject(id: string): void {
+    if (id === NEW) creating.value = true;
+    else if (id !== state.projectId) void openProject(id);
+}
+
+const localeItems = computed<TaoMenuItem[]>(() => codes.map((code) => ({ type: 'radio', id: code, group: 'locale', label: LOCALE_NAMES[code], checked: code === current.value })));
+const onLocale = (id: string): void => setLocale(id as LocaleCode);
 
 watch(
     () => state.project?.title,
@@ -55,68 +110,233 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
 </script>
 
 <template>
-    <div class="app">
-        <header class="bar">
-            <strong class="bar__name">Axis</strong>
-            <TaoSelect v-if="state.projects.length > 0" v-model="projectId" class="bar__project" :options="projectOptions" :clearable="false" :aria-label="t('project.choose')" />
-            <TaoButton variant="ghost" tone="neutral" icon="tao-plus" :aria-label="t('project.create')" :title="t('project.create')" @click="creating = true" />
-
-            <SearchField v-if="state.project" class="bar__search" />
-
-            <span class="bar__space"></span>
-
-            <TaoSegmented v-if="state.project" v-model="view" :aria-label="t('view.label')">
-                <TaoSegmentedOption value="tree" icon="tree" :label="t('view.tree')" />
-                <TaoSegmentedOption value="board" icon="board" :label="t('view.board')" />
-                <TaoSegmentedOption value="timeline" icon="timeline" :label="t('view.timeline')" />
-                <TaoSegmentedOption value="map" icon="map" :label="t('view.map')" />
-                <TaoSegmentedOption value="journal" icon="journal" :label="t('view.journal')" />
-            </TaoSegmented>
-            <TaoSelect v-model="locale" class="bar__locale" :options="localeOptions" :clearable="false" :aria-label="t('app.language')" />
-            <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
-        </header>
-
-        <TaoAlert v-if="state.offline" class="app__alert" tone="danger">
-            {{ t('app.offline') }}
-            <TaoButton variant="text" tone="neutral" @click="start()">{{ t('app.retry') }}</TaoButton>
-        </TaoAlert>
-
-        <main class="app__main">
-            <TaoLoader v-if="!state.ready" class="app__center" />
-            <TaoEmpty v-else-if="!state.project" class="app__center" :title="t('project.none')">
-                {{ t('project.noneText') }}
-                <template #action>
-                    <TaoButton icon="tao-plus" @click="creating = true">{{ t('project.create') }}</TaoButton>
+    <TaoNav :model-value="state.project ? state.view : ''" class="app__nav" :layout="layout" badge-tone="neutral" :items="items" :aria-label="t('nav.label')" @select="(id: string, event: Event) => { event.preventDefault(); onSelect(id); }">
+        <!-- the main action, then the project: the rail shows the action round and the project as an icon -->
+        <template #action>
+            <TaoButton icon="tao-plus" shortcut="N" :disabled="!state.project" @click="newRecord"><span class="tao-nav__action-label">{{ t('nav.newRecord') }}</span></TaoButton>
+            <TaoDropdownMenu v-if="state.ready && !narrow" class="nav-project" :items="projectItems" :menu-label="t('project.choose')" placement="bottom-start" @select="onProject">
+                <template #button>
+                    <span class="nav-chip" :title="t('project.choose')">
+                        <TaoIcon name="tao-folder" />
+                        <span class="nav-chip__text">{{ state.project?.title ?? t('project.choose') }}</span>
+                        <TaoIcon class="nav-chip__more" name="tao-chevron-down" />
+                    </span>
                 </template>
-            </TaoEmpty>
-            <div v-else-if="state.view === 'journal'" class="app__scroll"><JournalPane /></div>
-            <BoardPane v-else-if="state.view === 'board'" />
-            <TimelinePane v-else-if="state.view === 'timeline'" />
-            <MapPane v-else-if="state.view === 'map'" />
+            </TaoDropdownMenu>
+        </template>
 
-            <TaoSplit v-else v-model="split" class="app__split" :min="22" :max="70">
-                <template #start><TreePane /></template>
-                <template #end>
-                    <div class="app__scroll"><RecordPane /></div>
-                </template>
-            </TaoSplit>
-        </main>
+        <template #footer>
+            <div class="nav-foot">
+                <TaoDropdownMenu :items="localeItems" :menu-label="t('app.language')" placement="top-start" @select="onLocale">
+                    <template #button>
+                        <span class="nav-chip nav-chip--tool" :title="t('app.language')">
+                            <TaoIcon name="language" />
+                            <span class="nav-chip__text">{{ LOCALE_NAMES[current] }}</span>
+                        </span>
+                    </template>
+                </TaoDropdownMenu>
+                <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
+                <TaoButton
+                    v-if="!narrow"
+                    class="nav-fold"
+                    variant="ghost"
+                    tone="neutral"
+                    :icon="folded ? 'panel-open' : 'panel-close'"
+                    :aria-label="folded ? t('nav.expand') : t('nav.collapse')"
+                    :title="folded ? t('nav.expand') : t('nav.collapse')"
+                    @click="folded = !folded"
+                />
+            </div>
+        </template>
 
-        <StatusBar />
+        <div class="app">
+            <!-- a phone: the bar below has no room for the project, the language and the theme -->
+            <header v-if="narrow" class="app__bar">
+                <TaoDropdownMenu v-if="state.ready" :items="projectItems" :menu-label="t('project.choose')" placement="bottom-start" @select="onProject">
+                    <template #button>
+                        <span class="nav-chip">
+                            <TaoIcon name="tao-folder" />
+                            <span class="nav-chip__text">{{ state.project?.title ?? t('project.choose') }}</span>
+                            <TaoIcon class="nav-chip__more" name="tao-chevron-down" />
+                        </span>
+                    </template>
+                </TaoDropdownMenu>
+                <span class="app__space"></span>
+                <TaoDropdownMenu :items="localeItems" :menu-label="t('app.language')" @select="onLocale">
+                    <template #button>
+                        <span class="nav-chip nav-chip--tool" :title="t('app.language')"><TaoIcon name="language" /></span>
+                    </template>
+                </TaoDropdownMenu>
+                <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
+            </header>
+
+            <TaoAlert v-if="state.offline" class="app__alert" tone="danger">
+                {{ t('app.offline') }}
+                <TaoButton variant="text" tone="neutral" @click="start()">{{ t('app.retry') }}</TaoButton>
+            </TaoAlert>
+
+            <main class="app__main">
+                <TaoLoader v-if="!state.ready" class="app__center" />
+                <TaoEmpty v-else-if="!state.project" class="app__center" :title="t('project.none')">
+                    {{ t('project.noneText') }}
+                    <template #action>
+                        <TaoButton icon="tao-plus" @click="creating = true">{{ t('project.create') }}</TaoButton>
+                    </template>
+                </TaoEmpty>
+                <div v-else-if="state.view === 'journal'" class="app__scroll"><JournalPane /></div>
+                <BoardPane v-else-if="state.view === 'board'" />
+                <TimelinePane v-else-if="state.view === 'timeline'" />
+                <MapPane v-else-if="state.view === 'map'" />
+
+                <TaoSplit v-else v-model="split" class="app__split" :min="22" :max="70">
+                    <template #start><TreePane /></template>
+                    <template #end>
+                        <div class="app__scroll"><RecordPane /></div>
+                    </template>
+                </TaoSplit>
+            </main>
+
+            <StatusBar />
+        </div>
 
         <NewProjectDialog v-model="creating" />
-    </div>
+    </TaoNav>
 </template>
 
 <style scoped>
+.app__nav {
+    height: 100dvh;
+}
+
+/* the page beside the navigation fills the rest and scrolls inside its panes, not as a document / страница рядом с навигацией занимает остаток и прокручивается внутри своих панелей, а не как документ */
+.app__nav :deep(.tao-nav__shell) {
+    height: 100dvh;
+}
+
+.app__nav :deep(.tao-nav__content) {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/*
+ * On the side the column of the navigation runs the full height and its footer (language, theme, fold) sits at the bottom. In the bar
+ * look `--_panel-height` is `none`, the calc is invalid and the height stays automatic.
+ * Сбоку колонка навигации во всю высоту, а её подвал (язык, тема, свернуть) внизу. В виде панели снизу `--_panel-height`
+ * равен `none`, calc недействителен и высота остаётся автоматической.
+ */
+.app__nav :deep(.tao-nav__column) {
+    height: calc(var(--_panel-height) - 2 * var(--_pad));
+}
+
+/* the action and the project one under the other / действие и проект один под другим */
+.app__nav :deep(.tao-nav__action) {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--tao-space-2);
+}
+
+.app__nav :deep(.tao-nav__list) {
+    flex: 0 1 auto;
+}
+
+.app__nav :deep(.tao-nav__footer) {
+    margin-top: auto;
+}
+
 .app {
     display: flex;
     flex-direction: column;
-    height: 100dvh;
+    height: 100%;
     min-height: 0;
 }
 
-.bar {
+/*
+ * `--_compact` is TaoNav's own variable: 1 on the rail, 0 on the side panel. The chips use it to show only their icon on the rail
+ * (a text and a chevron shrink to nothing) and the whole chip with the text on the side panel.
+ * `--_compact` это собственная переменная TaoNav: 1 на рейке, 0 в боковой панели. Фишки берут её, чтобы на рейке показывать
+ * только иконку (текст и стрелка сжимаются в ничто), а в боковой панели фишку целиком с текстом.
+ */
+.nav-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc((1 - var(--_compact, 0)) * var(--tao-space-2));
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: var(--tao-control-height);
+    padding: 0 calc((1 - var(--_compact, 0)) * var(--tao-space-3));
+    /* on the rail the chip is a plain round icon: no frame (its arcs were cut by the round box), a faint fill instead / на рейке фишка это простая круглая иконка: без рамки (её дуги обрезались круглой коробкой), вместо неё слабая заливка */
+    border: calc((1 - var(--_compact, 0)) * 1px) solid var(--tao-color-border-strong);
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--tao-color-text) calc(var(--_compact, 0) * 8%), transparent);
+    color: var(--tao-color-text);
+    font-size: var(--tao-control-font-size);
+}
+
+.nav-chip--tool {
+    border-color: transparent;
+    background: none;
+    color: var(--tao-color-text-muted);
+}
+
+.nav-chip__text {
+    flex: 1;
+    min-width: 0;
+    max-width: calc((1 - var(--_compact, 0)) * 600px);
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nav-chip__more {
+    flex: none;
+    max-width: calc((1 - var(--_compact, 0)) * 24px);
+    overflow: hidden;
+    color: var(--tao-color-text-muted);
+}
+
+.nav-project.nav-project {
+    /* TaoNav gives every child of the action the side padding of a button: the project is a chip with its own inside / TaoNav даёт каждому ребёнку действия боковой отступ кнопки: у проекта фишка со своим отступом внутри */
+    padding-inline: 0;
+    /* TaoNav squares its action children on the rail by their height (aspect-ratio): the project needs one, as the button has / TaoNav делает детей действия на рейке квадратными по высоте: проекту она нужна, как и кнопке */
+    height: var(--tao-control-height);
+}
+
+.nav-project :deep(.tao-dropdown-menu__button) {
+    border-radius: inherit;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: none;
+}
+
+.nav-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--tao-space-1);
+}
+
+/* on the rail each tool takes a whole row (a column of icons), on the side panel they stand side by side / на рейке каждый инструмент занимает целую строку (столбец иконок), в боковой панели они стоят рядом */
+.nav-foot > * {
+    display: flex;
+    justify-content: center;
+    min-width: calc(var(--_compact, 0) * 100%);
+}
+
+.nav-foot :deep(.tao-dropdown-menu__button) {
+    padding: 0;
+    background: none;
+}
+
+.app__bar {
+    /* the header is not the rail: the chips show their text (the variable is inherited from the shell of the navigation) / шапка не рейка: фишки показывают текст (переменная наследуется от оболочки навигации) */
+    --_compact: 0;
     flex: none;
     display: flex;
     align-items: center;
@@ -126,26 +346,18 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
     background: var(--tao-color-surface);
 }
 
-.bar__name {
-    margin-right: var(--tao-space-2);
-    color: var(--tao-color-text-strong);
-    font-size: var(--tao-font-size-lg);
-    letter-spacing: 0.02em;
+.app__bar .nav-chip {
+    width: auto;
+    max-width: 200px;
 }
 
-.bar__project {
-    width: 220px;
-}
-
-.bar__space {
+.app__space {
     flex: 1;
 }
 
-.bar__locale {
-    width: 120px;
-}
-
 .app__alert {
+    /* TaoAlert is 100% wide: with side margins that is wider than the window; auto lets the column stretch it inside the margins / TaoAlert шириной 100%: с боковыми отступами это шире окна; auto даёт колонке растянуть его внутри отступов */
+    width: auto;
     margin: var(--tao-space-2) var(--tao-space-3) 0;
 }
 
@@ -170,11 +382,5 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
     height: 100%;
     min-width: 0;
     overflow: auto;
-}
-
-@media (max-width: 900px) {
-    .bar {
-        flex-wrap: wrap;
-    }
 }
 </style>

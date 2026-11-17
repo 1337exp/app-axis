@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * The lines layer of the map, one SVG in the world under the cards: the relations of the tree (thin, quiet), the typed
- * links (clearly visible, an arrowhead, a small label of the kind, a line style per kind: solid / dashed / dotted, not a
- * colour), the line being dragged out, and the alignment guides of a drag. Thickness is in screen pixels at any zoom.
- * TaoUX's `TaoxLinks` has no line style per line (only a colour), so the layer is drawn here; the canvas only needs
- * `data-conn-id` on a link and a wide hit path, and both are here.
+ * What the map draws under the cards besides the typed links: the relations of the tree (thin, quiet), the small labels of
+ * the kinds that sit on the typed links, and the alignment guides of a drag. One SVG in the world; the thickness is in screen
+ * pixels at any zoom. The typed links themselves and the line being dragged out are TaoUX's `TaoxLinks` (the line style per
+ * kind is its `dash`); the library has no labels, and the tree routes around wrapped columns are the app's own geometry,
+ * so those two stay here.
  *
- * Слой линий карты, один SVG в мире под карточками: связи дерева (тонкие, тихие), типизированные связи (хорошо видны,
- * стрелка, маленькая подпись вида, стиль линии на вид: сплошная / штрих / точки, а не цвет), линия, которую тянут, и
- * направляющие при переносе. Толщина в пикселях экрана при любом масштабе. У `TaoxLinks` из TaoUX нет стиля линии на
- * каждую (только цвет), поэтому слой нарисован тут; холсту нужен лишь `data-conn-id` на связи и широкая зона попадания.
+ * Что карта рисует под карточками, кроме типизированных связей: связи дерева (тонкие, тихие), маленькие подписи видов,
+ * что сидят на типизированных связях, и направляющие при переносе. Один SVG в мире; толщина в пикселях экрана при любом
+ * масштабе. Сами типизированные связи и линия, которую тянут, это `TaoxLinks` из TaoUX (стиль линии на вид это его
+ * `dash`); подписей у библиотеки нет, а обход столбцов в линиях дерева это своя геометрия приложения, поэтому они здесь.
  */
 import type { LinkKind } from '@/core/model';
 
@@ -39,9 +39,9 @@ export interface Guide {
 
 defineProps<{
     tree: readonly TreeLine[];
-    links: readonly TypedLine[];
+    /** The typed links, here only for their labels. / Типизированные связи, здесь только ради подписей. */
+    labels: readonly TypedLine[];
     selectedId: string | null;
-    preview: { d: string; head: string } | null;
     guides: readonly Guide[];
     zoom: number;
 }>();
@@ -57,16 +57,19 @@ defineProps<{
             <path :d="line.axis === 'x' ? `M${line.at} ${line.from}V${line.to}` : `M${line.from} ${line.at}H${line.to}`" />
         </g>
 
-        <g v-for="line in links" :key="line.id" class="mlink" :class="[`mlink--${line.kind}`, { 'mlink--selected': selectedId === line.id, 'mlines__dim': line.dim }]" :data-conn-id="line.id">
-            <path class="mlink__line" :d="line.d" />
-            <path class="mlink__head" :d="line.head" />
-            <path class="mlink__hit" :d="line.d" />
-            <text v-if="zoom >= 0.35" class="mlink__label" :x="line.mid.x" :y="line.mid.y" :font-size="Math.min(12 / zoom, 22)" :stroke-width="4 / zoom" text-anchor="middle" dominant-baseline="central">{{ line.label }}</text>
-        </g>
-
-        <g v-if="preview" class="mlines__preview">
-            <path class="mlines__preview-line" :d="preview.d" />
-            <path class="mlines__preview-head" :d="preview.head" />
+        <g v-if="zoom >= 0.35" class="mlines__labels">
+            <text
+                v-for="line in labels"
+                :key="line.id"
+                class="mlink__label"
+                :class="{ 'mlink__label--selected': selectedId === line.id, 'mlines__dim': line.dim }"
+                :x="line.mid.x"
+                :y="line.mid.y"
+                :font-size="Math.min(12 / zoom, 22)"
+                :stroke-width="4 / zoom"
+                text-anchor="middle"
+                dominant-baseline="central"
+            >{{ line.label }}</text>
         </g>
     </svg>
 </template>
@@ -103,81 +106,16 @@ defineProps<{
     opacity: 0.8;
 }
 
-.mlink {
-    --mlink-color: var(--tao-color-text-muted);
-    color: var(--mlink-color);
-}
-
-.mlink:hover,
-.mlink--selected {
-    --mlink-color: var(--tao-color-text-strong);
-}
-
-.mlink--selected {
-    --mlink-color: var(--tao-color-accent);
-}
-
-.mlink__line {
-    stroke: var(--mlink-color);
-    stroke-width: 1.6;
-}
-
-.mlink:hover .mlink__line,
-.mlink--selected .mlink__line {
-    stroke-width: 2.4;
-}
-
-/* the line style tells the kind: depends solid, because dashed, relates dotted / вид читается по линии: «зависит» сплошная, «потому что» штрих, «связано» точки */
-.mlink--because .mlink__line {
-    stroke-dasharray: 8 5;
-}
-
-.mlink--relates .mlink__line {
-    stroke-dasharray: 1 5;
-    stroke-width: 2.2;
-}
-
-.mlink--relates:hover .mlink__line,
-.mlink--relates.mlink--selected .mlink__line {
-    stroke-width: 3;
-}
-
-.mlines .mlink__head {
-    fill: var(--mlink-color);
-    stroke: none;
-}
-
-.mlink__hit {
-    stroke: transparent;
-    stroke-width: 14;
-    pointer-events: stroke;
-    cursor: pointer;
-}
-
-@media (pointer: coarse) {
-    .mlink__hit {
-        stroke-width: 30;
-    }
-}
-
 .mlink__label {
-    fill: var(--mlink-color);
+    fill: var(--tao-color-text-muted);
     stroke: var(--tao-color-bg);
     paint-order: stroke;
     stroke-linejoin: round;
     pointer-events: none;
     user-select: none;
-    vector-effect: none;
 }
 
-.mlines__preview-line {
-    stroke: var(--tao-color-accent);
-    stroke-width: 1.6;
-    stroke-dasharray: 6 4;
-}
-
-.mlines .mlines__preview-head {
+.mlink__label--selected {
     fill: var(--tao-color-accent);
-    stroke: none;
 }
 </style>

@@ -54,6 +54,8 @@ import { useI18n } from '@/i18n';
 import FilterBar from './FilterBar.vue';
 import { emptyPlaceAt } from './hit';
 import MapCard from './MapCard.vue';
+import { TaoxLinks } from '@1337exp/taoux/links';
+import type { LinkLine } from '@1337exp/taoux/links';
 import MapLines from './MapLines.vue';
 import type { Guide, TreeLine, TypedLine } from './MapLines.vue';
 import RecordDrawer from './RecordDrawer.vue';
@@ -195,6 +197,18 @@ const linkLineList = computed<TypedLine[]>(() => {
     }
     return out;
 });
+
+/**
+ * The typed links for `TaoxLinks`: the line style tells the kind (depends solid, because dashed, relates dotted); a link the
+ * search did not find fades (a colour with no weight in it).
+ * Типизированные связи для `TaoxLinks`: вид читается по стилю линии («зависит» сплошная, «потому что» штрих, «связано» точки);
+ * связь, которую поиск не нашёл, бледнеет (цвет почти без веса).
+ */
+const DASH = { depends: 'solid', because: 'dashed', relates: 'dotted' } as const;
+const FADED = 'color-mix(in srgb, var(--tao-color-text-muted) 22%, transparent)';
+const libraryLinks = computed<LinkLine[]>(() =>
+    linkLineList.value.map((line) => ({ id: line.id, d: line.d, head: line.head, dash: DASH[line.kind], width: line.kind === 'relates' ? 2.2 : 1.6, ...(line.dim ? { color: FADED } : {}) })),
+);
 
 const selectedLink = ref<string | null>(null);
 const selectedLine = computed(() => linkLineList.value.find((l) => l.id === selectedLink.value) ?? null);
@@ -395,7 +409,7 @@ const previewLine = computed(() => {
     const tr = c.target ? rects.value.get(c.target.node) : undefined;
     const end = c.target && tr && c.target.node !== c.origin.node ? pointOn(tr, c.target.side) : c.cursor;
     const line = curve(pointOn(a, c.origin.side), end, headSize.value);
-    return { d: line.d, head: line.head };
+    return { id: 'preview', d: line.d, head: line.head };
 });
 
 async function addLink(from: string, to: string, kind: LinkKind): Promise<void> {
@@ -487,12 +501,6 @@ const toScreen = (world: MapPoint): MapPoint => {
 };
 
 const host: CanvasHost<Pin> = {
-    // the keys of the page (the record pane, a dialog) are not ours: only a press on the canvas or on nothing is / клавиши страницы (панель записи, диалог) не наши: только нажатие на холсте или ни на чём
-    claimsKey: (event) => {
-        const target = event.target as Node | null;
-        return !(target === document.body || (target instanceof Node && canvas.value?.root?.contains(target)));
-    },
-
     get camera() {
         return camera;
     },
@@ -616,7 +624,8 @@ function pinNear(e: { clientX: number; clientY: number }): Pin | null {
     return { node: el.dataset.nodeId!, side: sideNear({ x: r.left, y: r.top, w: r.width, h: r.height }, { x: e.clientX, y: e.clientY }) };
 }
 
-const options: CanvasOptions<Pin> = { pinAt, pinNear, zoom: LIMITS, inertia: true };
+// `keys: 'focus'`: the canvas takes Delete, Escape and the rest only from a press inside it, so the record pane and the dialogs beside it keep their keys / `keys: 'focus'`: холст берёт Delete, Escape и остальное только из нажатия внутри себя, так что панель записи и диалоги рядом сохраняют свои клавиши
+const options: CanvasOptions<Pin> = { pinAt, pinNear, zoom: LIMITS, inertia: true, keys: 'focus' };
 
 // ───────────────────────────── double click, keys / двойной клик, клавиши ─────────────────────────────
 
@@ -734,7 +743,8 @@ onBeforeUnmount(() => {
 
         <div class="map-pane__stage" @keydown="onKeydown" @pointerdown.capture="trackAlt" @dblclick="onDouble">
             <TaoxCanvas ref="canvas" :host="host" :options="options" background="dots" role="application" :aria-label="t('map.canvas')">
-                <MapLines :tree="treeLineList" :links="linkLineList" :selected-id="selectedLink" :preview="previewLine" :guides="guides" :zoom="zoom" />
+                <MapLines :tree="treeLineList" :labels="linkLineList" :selected-id="selectedLink" :guides="guides" :zoom="zoom" />
+                <TaoxLinks :lines="libraryLinks" :selected-id="selectedLink" :preview="previewLine" />
 
                 <MapCard
                     v-for="record in shown"

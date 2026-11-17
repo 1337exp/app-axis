@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * The search field of the header: one line for every view. `/` and Ctrl+K focus it (not while typing in a field or the
+ * The search field: one line for every view, placed in the view (above the tree, in the toolbar of the board, the timeline and the map, above the journal).
+ * With `fold` it is an icon until it is opened (a toolbar that has no room); with `wide` it fills its row. `/` and Ctrl+K focus it (not while typing in a field or the
  * editor), Escape clears it and, pressed again, leaves it; Enter asks the map to bring the found cards into view. On a narrow
  * window it is an icon that opens the field. A small "N found" stands beside it while a line is typed.
  *
@@ -10,6 +11,8 @@
  */
 import { TaoButton, TaoIcon, TaoInput } from '@1337exp/taoui';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+
+defineProps<{ fold?: boolean; wide?: boolean }>();
 import { clearSearch, found, search, searching } from '@/app/search';
 import { tn, useI18n } from '@/i18n';
 
@@ -60,7 +63,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey));
 </script>
 
 <template>
-    <div ref="root" class="search" :class="{ 'search--open': open || searching }" role="search">
+    <div ref="root" class="search" :class="{ 'search--open': open || searching, 'search--fold': fold, 'search--wide': wide }" role="search">
         <TaoButton class="search__icon" variant="ghost" tone="neutral" icon="tao-search" :aria-label="t('search.open')" :title="t('search.open')" @click="focus" />
         <TaoInput
             v-model="search.line"
@@ -123,25 +126,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey));
     white-space: nowrap;
 }
 
-/* a narrow window: an icon that opens the field */
-@media (max-width: 900px) {
-    .search__input {
-        width: 200px;
-    }
+/* folded: an icon that opens the field */
+.search--fold:not(.search--open) .search__icon {
+    display: inline-flex;
 }
 
-@media (max-width: 700px) {
-    .search__icon {
-        display: inline-flex;
-    }
+.search--fold:not(.search--open) .search__input,
+.search--fold:not(.search--open) .search__count {
+    display: none;
+}
 
-    .search:not(.search--open) .search__input,
-    .search:not(.search--open) .search__count {
-        display: none;
-    }
+.search--wide {
+    width: 100%;
+}
 
-    .search--open .search__icon {
-        display: none;
-    }
+.search--wide .search__input {
+    flex: 1;
+    width: auto;
 }
 </style>
