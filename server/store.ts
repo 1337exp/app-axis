@@ -24,17 +24,20 @@ import { diffRecord, parseEntry } from '../src/core/journal.ts';
 import type { JournalEntry } from '../src/core/journal.ts';
 import {
     RECORD_VERSION,
+    cleanRemark,
     cleanTitle,
     isAssetName,
     isAuthor,
+    isBrainRole,
     isDay,
     isId,
     isLinkKind,
     isRecordType,
     isStatus,
+    normalizeBrain,
     normalizeRecord,
 } from '../src/core/model.ts';
-import type { Author, AxisDraft, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
+import type { Author, AxisDraft, Brain, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
 import { isCamera, isPoint, normalizeMap, patchMap } from '../src/core/map.ts';
 import type { MapData, MapPatch } from '../src/core/map.ts';
 import { textToDoc } from '../src/core/text.ts';
@@ -69,6 +72,22 @@ export interface RecordInput {
     due?: unknown;
     links?: unknown;
     images?: unknown;
+    /**
+     * The part in a brainstorm round: seed | variant | verdict; an empty string or null clears it. The way the agent sets
+     * a role (it cannot set the rest of `brain`).
+     * Роль в раунде брейншторма: seed | variant | verdict; пустая строка или null снимает. Так роль задаёт агент
+     * (остальное в `brain` он задавать не может).
+     */
+    role?: unknown;
+    /**
+     * `{ role?, like?, dislike?, remark?, handed? }`: partial, only the keys passed change; `null` clears the whole field.
+     * `like`, `dislike` and `remark` stick only to a variant, `handed` only to a seed, the rest is ignored. Only the person
+     * sets all of it: from Claude only `role` is taken.
+     * Частичный объект: меняются только переданные ключи; `null` снимает поле целиком. `like`, `dislike` и `remark`
+     * держатся только у варианта, `handed` только у задумки, остальное игнорируется. Всё это ставит только человек:
+     * от Claude берётся лишь `role`.
+     */
+    brain?: unknown;
     /** The reason: goes to the journal. / Причина: попадает в журнал. */
     why?: unknown;
     /**
@@ -261,6 +280,52 @@ export function createStore(root: string): Store {
         return [...new Set(value)];
     };
 
+    /**
+     * The brainstorm field after a change. `role` (or `brain.role`) sets or clears the part; the other keys of `brain`
+     * change only what is passed, and only from the person. What does not fit the role is dropped by `normalizeBrain`.
+     */
+    const brainOf = (current: Brain | null, input: RecordInput, by: Author): Brain | null => {
+        const { brain } = input;
+        if (brain !== undefined && brain !== null && (typeof brain !== 'object' || Array.isArray(brain))) throw new AxisError(400, '"brain" is { role?, like?, dislike?, remark?, handed? } or null');
+        const given = brain === undefined || brain === null ? {} : (brain as Record<string, unknown>);
+        let next = current;
+        if (brain === null) next = null;
+        const role = input.role !== undefined ? input.role : given.role;
+        if (role !== undefined) {
+            if (role === null || role === '') next = null;
+            else if (isBrainRole(role)) next = next?.role === role ? next : normalizeBrain({ ...(next ?? {}), role });
+            else throw new AxisError(400, 'role: seed | variant | verdict (an empty string clears it)');
+        }
+        if (by === 'claude' || next === null) return next;
+        const patch: Record<string, unknown> = { ...next };
+        for (const key of ['like', 'dislike', 'handed'] as const) {
+            if (given[key] === undefined) continue;
+            if (typeof given[key] !== 'boolean') throw new AxisError(400, `brain.${key} is true or false`);
+            patch[key] = given[key];
+        }
+        if (given.remark !== undefined) {
+            if (typeof given.remark !== 'string') throw new AxisError(400, 'brain.remark is a text');
+            patch.remark = cleanRemark(given.remark);
+        }
+        return normalizeBrain(patch);
+    };
+
+    /**
+     * A verdict (or a variant) added under a seed passes the turn back to the person: the seed's `handed` is cleared, with
+     * a line in the journal. A variant does it too, or the seed would keep saying "waits for Claude" while the person rates.
+     * Вердикт (или вариант) под задумкой возвращает ход человеку: у задумки снимается `handed`, в журнале строка.
+     * Вариант тоже, иначе задумка писала бы «ждёт Claude», пока человек оценивает.
+     */
+    const passTurnBack = (project: string, all: readonly AxisRecord[], child: AxisRecord, by: Author): void => {
+        const role = child.brain?.role;
+        if ((role !== 'verdict' && role !== 'variant') || child.parent === null) return;
+        const seed = all.find((r) => r.id === child.parent);
+        if (!seed || seed.brain?.role !== 'seed' || !seed.brain.handed) return;
+        const after: AxisRecord = { ...seed, brain: { ...seed.brain, handed: false }, updated: now(), updatedBy: by };
+        writeRecord(project, after);
+        append(project, { t: after.updated, by, kind: 'update', record: seed.id, title: seed.title, changes: { handed: ['yes', ''] }, text: `${role} added, turn passed back to the person` });
+    };
+
     return {
         root,
 
@@ -340,6 +405,7 @@ export function createStore(root: string): Store {
             const parent = input.parent === undefined || input.parent === null || input.parent === '' ? null : input.parent;
             if (parent !== null && (!isId(parent) || !all.some((r) => r.id === parent))) throw new AxisError(404, `No parent record "${String(parent)}"`);
             if (input.due !== undefined && input.due !== null && !isDay(input.due)) throw new AxisError(400, 'due is a day YYYY-MM-DD');
+            const brain = brainOf(null, input, by);
             let id = newId();
             while (all.some((r) => r.id === id)) id = newId();
             const after = input.after === null ? null : isId(input.after) ? input.after : undefined;
@@ -356,6 +422,7 @@ export function createStore(root: string): Store {
                 links: input.links === undefined ? [] : linksOf(input.links, id, all),
                 due: isDay(input.due) ? input.due : null,
                 images: input.images === undefined ? [] : imagesOf(input.images, project),
+                brain,
                 created: stamp,
                 updated: stamp,
                 createdBy: by,
@@ -363,6 +430,7 @@ export function createStore(root: string): Store {
             };
             writeRecord(project, record);
             append(project, { t: stamp, by, kind: 'create', record: id, title, ...why(input.why) });
+            passTurnBack(project, all, record, by);
             return record;
         },
 
@@ -397,6 +465,7 @@ export function createStore(root: string): Store {
             if (body !== undefined) after.body = body;
             if (input.links !== undefined) after.links = linksOf(input.links, id, all);
             if (input.images !== undefined) after.images = imagesOf(input.images, project);
+            if (input.role !== undefined || input.brain !== undefined) after.brain = brainOf(before.brain ?? null, input, by);
             const reparent = input.parent !== undefined;
             if (reparent) {
                 const parent = input.parent === null || input.parent === '' ? null : input.parent;
@@ -415,6 +484,8 @@ export function createStore(root: string): Store {
             writeRecord(project, after);
             // a reorder among the same siblings is not news; anything else gets a line
             if (changes) append(project, { t: after.updated, by, kind: 'update', record: id, title: after.title, changes, ...why(input.why) });
+            // a record that became a verdict or a variant, or moved under another seed as one, passes the turn back
+            if (after.brain?.role !== before.brain?.role || before.parent !== after.parent) passTurnBack(project, all, after, by);
             return after;
         },
 

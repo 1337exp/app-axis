@@ -109,3 +109,44 @@ describe('the map over HTTP', () => {
         expect((await send('DELETE', '/map')).status).toBe(405);
     });
 });
+
+describe('the brainstorm field over HTTP', () => {
+    it('takes brain on create and a partial brain on PATCH, and only from the person', async () => {
+        const seed = await send('POST', '/records', { type: 'idea', title: 'Seed', brain: { role: 'seed' } });
+        expect(seed.status).toBe(201);
+        expect(seed.data.record.brain).toEqual({ role: 'seed', like: false, dislike: false, remark: '', handed: false });
+        const sid = seed.data.record.id as string;
+        const made = await send('POST', '/records', { type: 'idea', title: 'Option', parent: sid, role: 'variant' }, 'claude');
+        const vid = made.data.record.id as string;
+
+        // only the keys passed change
+        const liked = await send('PATCH', `/records/${vid}`, { brain: { like: true } });
+        expect(liked.status).toBe(200);
+        expect(liked.data.record.brain).toEqual({ role: 'variant', like: true, dislike: false, remark: '', handed: false });
+        const noted = await send('PATCH', `/records/${vid}`, { brain: { remark: 'hmm' } });
+        expect(noted.data.record.brain).toMatchObject({ like: true, remark: 'hmm' });
+        const handed = await send('PATCH', `/records/${sid}`, { brain: { handed: true } });
+        expect(handed.data.record.brain.handed).toBe(true);
+
+        // what does not fit is ignored; a bad shape is refused
+        expect((await send('PATCH', `/records/${vid}`, { brain: { handed: true } })).data.record.brain.handed).toBe(false);
+        expect((await send('PATCH', `/records/${vid}`, { brain: { like: 'yes' } })).status).toBe(400);
+        expect((await send('PATCH', `/records/${vid}`, { role: 'boss' })).status).toBe(400);
+
+        // Claude over HTTP is the same as through MCP: the role only
+        const sneaky = await send('PATCH', `/records/${vid}`, { brain: { dislike: true } }, 'claude');
+        expect(sneaky.data.record.brain.dislike).toBe(false);
+
+        // the journal says what changed, and a verdict hands the turn back
+        const entry = (await send('GET', `/records/${sid}`)).data.journal[0];
+        expect(entry).toMatchObject({ kind: 'update', changes: { handed: ['', 'yes'] } });
+        const verdict = await send('POST', '/records', { type: 'note', title: 'Verdict', parent: sid, role: 'verdict' }, 'claude');
+        expect(verdict.status).toBe(201);
+        const after = (await send('GET', '')).data.records as { id: string; brain: { handed: boolean } | null }[];
+        expect(after.find((r) => r.id === sid)!.brain!.handed).toBe(false);
+        expect(after.find((r) => r.id === vid)!.brain).toMatchObject({ role: 'variant', like: true });
+
+        // clearing
+        expect((await send('PATCH', `/records/${vid}`, { brain: null })).data.record.brain).toBeNull();
+    });
+});

@@ -5,6 +5,7 @@
  * Что видит агент: проект и запись компактным текстом. Оглавление читается моделью быстрее и дешевле,
  * чем куча JSON, а id для следующего вызова стоят тут же.
  */
+import { ratingOf } from '../src/core/brainstorm.ts';
 import type { JournalEntry } from '../src/core/journal.ts';
 import { hasStatus } from '../src/core/model.ts';
 import type { AxisProject, AxisRecord } from '../src/core/model.ts';
@@ -18,6 +19,22 @@ const progressText = (p: Progress): string =>
         .filter(Boolean)
         .join(', ');
 
+const RATING_MARK = { good: '+', bad: '-', disputed: '±', neutral: '' } as const;
+
+/**
+ * The brainstorm mark at the end of an outline line: a seed (with "waits for Claude" when its turn is passed), a variant
+ * with its rating (`+` good, `-` bad, `±` disputed, nothing for neutral) and `✎` when the person left a remark, a verdict.
+ * Метка брейншторма в конце строки оглавления: задумка (с «waits for Claude», когда ход передан), вариант с оценкой
+ * (`+` хорошо, `-` плохо, `±` спорно, ничего для нейтрального) и `✎`, если есть заметка человека, вердикт.
+ */
+export function brainMark(r: AxisRecord): string {
+    const b = r.brain;
+    if (!b) return '';
+    if (b.role === 'seed') return b.handed ? 'seed  ⏳ waits for Claude' : 'seed';
+    if (b.role === 'variant') return ['variant', RATING_MARK[ratingOf(r)], b.remark ? '✎' : ''].filter(Boolean).join(' ');
+    return 'verdict';
+}
+
 function line(node: TreeNode): string {
     const r = node.record;
     const kind = hasStatus(r.type) ? `${r.type}·${r.status}` : r.type;
@@ -30,6 +47,8 @@ function line(node: TreeNode): string {
     if (r.body) parts.push('¶');
     if (r.images.length > 0) parts.push(`🖼${r.images.length}`);
     for (const link of r.links) parts.push(`→ ${link.kind}:${link.to}`);
+    const mark = brainMark(r);
+    if (mark) parts.push(mark);
     return `${'  '.repeat(node.depth)}- ${parts.join('  ')}`;
 }
 
@@ -89,6 +108,13 @@ export function recordText(record: AxisRecord, records: readonly AxisRecord[], j
     const out = [`[${record.id}] ${hasStatus(record.type) ? `${record.type}·${record.status}` : record.type}  ${record.title}`];
     if (path) out.push(`in: ${path}`);
     if (record.due) out.push(`due: ${record.due}`);
+    const b = record.brain;
+    if (b?.role === 'seed') out.push(`brainstorm: seed${b.handed ? ', handed: it is your turn (offer variants, or add a verdict once they are rated)' : ''}`);
+    else if (b?.role === 'variant') {
+        const rating = ratingOf(record);
+        out.push(`brainstorm: variant, rating: ${rating}${rating === 'good' ? ' (liked)' : rating === 'bad' ? ' (disliked)' : rating === 'disputed' ? ' (liked and disliked)' : ' (not rated)'}`);
+        if (b.remark) out.push(`remark of the person: ${b.remark}`);
+    } else if (b?.role === 'verdict') out.push('brainstorm: verdict');
     out.push(`created ${record.created.slice(0, 10)} by ${record.createdBy}, updated ${record.updated.slice(0, 16).replace('T', ' ')} by ${record.updatedBy}`);
     for (const link of record.links) out.push(`→ ${link.kind} [${link.to}] ${title(link.to)}`);
     for (const other of records) for (const link of other.links) if (link.to === record.id) out.push(`← ${link.kind} from [${other.id}] ${other.title}`);

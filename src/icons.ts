@@ -29,6 +29,13 @@ export function registerAppIcons(): void {
         map: { body: '<rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/><path d="M10 6.5h2.5a1.5 1.5 0 0 1 1.5 1.5v0M10 6.5h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 0"/>' },
         fit: { body: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="9" y="9" width="6" height="6" rx="1"/>' },
         tidy: { body: '<path d="M5 6h6M5 12h10M5 18h6M15 6l4 0M19 18l-4 0"/><circle cx="18" cy="12" r="2"/>' },
+        // brainstorm: a big spark and a small one / брейншторм: большая искра и малая
+        brainstorm: { body: '<path d="M10 3l2 5.8L17.8 11 12 13.2 10 19l-2-5.8L2.2 11 8 8.8z"/><path d="M19 3l.8 2.2L22 6l-2.2.8L19 9l-.8-2.2L16 6l2.2-.8z"/>' },
+        // thumbs: an outline, and the same filled when the mark is on (the colour is not the message, the fill is) / большие пальцы: контур и он же залитый, когда отметка стоит (смысл несёт заливка, не цвет)
+        'thumb-up': { body: '<path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM7 11l4-8a2.5 2.5 0 0 1 2.5 2.7L13 9h5.5a2 2 0 0 1 2 2.3l-1 7a2 2 0 0 1-2 1.7H7"/>' },
+        'thumb-up-fill': { body: '<path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM7 11l4-8a2.5 2.5 0 0 1 2.5 2.7L13 9h5.5a2 2 0 0 1 2 2.3l-1 7a2 2 0 0 1-2 1.7H7" fill="currentColor"/>' },
+        'thumb-down': { body: '<g transform="rotate(180 12 12)"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM7 11l4-8a2.5 2.5 0 0 1 2.5 2.7L13 9h5.5a2 2 0 0 1 2 2.3l-1 7a2 2 0 0 1-2 1.7H7"/></g>' },
+        'thumb-down-fill': { body: '<g transform="rotate(180 12 12)"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM7 11l4-8a2.5 2.5 0 0 1 2.5 2.7L13 9h5.5a2 2 0 0 1 2 2.3l-1 7a2 2 0 0 1-2 1.7H7" fill="currentColor"/></g>' },
         tree: { body: '<path d="M5 5h5M5 5v14M5 12h5M5 19h5M13 5h6M13 12h6M13 19h6"/>' },
     });
 }

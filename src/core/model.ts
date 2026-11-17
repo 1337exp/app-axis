@@ -42,6 +42,57 @@ export interface RecordLink {
     kind: LinkKind;
 }
 
+/**
+ * The part a record plays in a brainstorm round: `seed` (the person's starting thought), `variant` (what Claude
+ * offers under a seed), `verdict` (Claude's summary under a seed after the person rated the variants).
+ *
+ * Роль записи в раунде брейншторма: `seed` (задумка человека), `variant` (вариант Claude под задумкой),
+ * `verdict` (вердикт Claude под задумкой после оценок человека).
+ */
+export const BRAIN_ROLES = ['seed', 'variant', 'verdict'] as const;
+export type BrainRole = (typeof BRAIN_ROLES)[number];
+
+/** The longest remark of the person on a variant. / Самая длинная заметка человека к варианту. */
+export const BRAIN_REMARK_MAX = 1000;
+
+/**
+ * The brainstorm field of a record. `like`, `dislike` and `remark` mean something only on a `variant`, `handed`
+ * only on a `seed` (the turn is passed to Claude); on other roles they are always off/empty.
+ *
+ * Поле брейншторма у записи. `like`, `dislike` и `remark` имеют смысл только у `variant`, `handed` только у `seed`
+ * (ход передан Claude); у других ролей они всегда выключены/пусты.
+ */
+export interface Brain {
+    role: BrainRole;
+    like: boolean;
+    dislike: boolean;
+    remark: string;
+    handed: boolean;
+}
+
+export const isBrainRole = (value: unknown): value is BrainRole => BRAIN_ROLES.includes(value as BrainRole);
+
+/** A remark: trimmed, cut to the limit. / Заметка: без краёв, не длиннее предела. */
+export const cleanRemark = (value: unknown): string => (typeof value === 'string' ? value.trim().slice(0, BRAIN_REMARK_MAX).trim() : '');
+
+/**
+ * A brain field made valid: what does not fit the role is dropped; no or an unknown role gives null.
+ * Поле брейншторма приводится к верному: что не подходит роли, отбрасывается; нет роли или она чужая это null.
+ */
+export function normalizeBrain(raw: unknown): Brain | null {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+    const b = raw as Record<string, unknown>;
+    if (!isBrainRole(b.role)) return null;
+    const variant = b.role === 'variant';
+    return {
+        role: b.role,
+        like: variant && b.like === true,
+        dislike: variant && b.dislike === true,
+        remark: variant ? cleanRemark(b.remark) : '',
+        handed: b.role === 'seed' && b.handed === true,
+    };
+}
+
 export interface AxisRecord {
     v: typeof RECORD_VERSION;
     id: string;
@@ -59,6 +110,13 @@ export interface AxisRecord {
     due: string | null;
     /** File names in the project's `assets/`. / Имена файлов в `assets/` проекта. */
     images: string[];
+    /**
+     * The brainstorm part, or null/absent for an ordinary record. `normalizeRecord` always sets it (null when none),
+     * so a record read from the store has it; it is optional only for code that builds a record by hand.
+     * Роль в брейншторме; null или нет поля у обычной записи. `normalizeRecord` задаёт его всегда (null, если нет),
+     * поэтому у записи из хранилища оно есть; необязательно оно только для кода, собирающего запись руками.
+     */
+    brain?: Brain | null;
     created: string;
     updated: string;
     createdBy: Author;
@@ -169,6 +227,7 @@ export function normalizeRecord(raw: unknown, now: string): AxisRecord | null {
         links,
         due: isDay(r.due) ? r.due : null,
         images: Array.isArray(r.images) ? [...new Set(r.images.filter(isAssetName))] : [],
+        brain: normalizeBrain(r.brain),
         created: day(r.created),
         updated: day(r.updated),
         createdBy: isAuthor(r.createdBy) ? r.createdBy : 'user',

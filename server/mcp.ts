@@ -10,7 +10,8 @@
  * то сразу показывает каждое изменение. Всё, что сделано через эту дверь, подписано в журнале «claude».
  */
 import { createInterface } from 'node:readline';
-import { LINK_KINDS, RECORD_TYPES, STATUSES, isLinkKind } from '../src/core/model.ts';
+import { waitingSeeds } from '../src/core/brainstorm.ts';
+import { BRAIN_ROLES, LINK_KINDS, RECORD_TYPES, STATUSES, isLinkKind } from '../src/core/model.ts';
 import { entryText, hitText, outlineText, recordText, search } from './agent.ts';
 import { dataDir } from './config.ts';
 import { AxisError, createStore } from './store.ts';
@@ -32,6 +33,8 @@ const project = str('Project id (see axis_projects).');
 const recordId = str('Record id: the 8 characters in [brackets] in an outline.');
 const TEXT_HELP =
     'Markdown (read and written as is, so what axis_read shows can be sent back unchanged): paragraphs split by an empty line, "# heading" (levels 1-3), **bold**, *italic*, ~~strikethrough~~, `inline code`, [label](https://url), "- item" and "1. item" lists (nested by indent), "> quote", ``` code blocks with a language, GFM tables. Nothing else is kept: no images, rules or task lists.';
+const ROLE_HELP =
+    'Brainstorm role (optional): "seed" (the person\'s starting thought), "variant" (one option you offer under a seed), "verdict" (your summary under a seed after the variants were rated). Use it only inside a brainstorm round (see axis_add).';
 const WHY_HELP = 'Why this change is made, one or two sentences. Goes to the journal: it is the memory of the project, so give it whenever the reason is not obvious.';
 
 const need = (args: Args, key: string): string => {
@@ -49,7 +52,11 @@ const tools: Tool[] = [
             const list = store.projects();
             if (list.length === 0) return `No projects yet (data folder: ${store.root}). Create one with axis_create_project.`;
             return list
-                .map((p) => `${p.id}: ${p.title} · ${p.records} records · tasks ${p.progress.done}/${p.progress.total} done${p.progress.questions ? ` · ${p.progress.questions} open questions` : ''}${p.repo ? ` · repo ${p.repo}` : ''} · updated ${p.updated.slice(0, 10)}`)
+                .map((p) => {
+                    const waiting = waitingSeeds(store.records(p.id)).length;
+                    const waits = waiting > 0 ? ` · ${waiting} round${waiting === 1 ? ' waits' : 's wait'} for Claude` : '';
+                    return `${p.id}: ${p.title} · ${p.records} records · tasks ${p.progress.done}/${p.progress.total} done${p.progress.questions ? ` · ${p.progress.questions} open questions` : ''}${waits}${p.repo ? ` · repo ${p.repo}` : ''} · updated ${p.updated.slice(0, 10)}`;
+                })
                 .join('\n');
         },
     },
@@ -69,7 +76,7 @@ const tools: Tool[] = [
     {
         name: 'axis_overview',
         description:
-            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only.',
+            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict".',
         inputSchema: { type: 'object', properties: { project, record: str('Optional: show only the branch under this record.') }, required: ['project'] },
         run(args) {
             const id = need(args, 'project');
@@ -78,7 +85,7 @@ const tools: Tool[] = [
     },
     {
         name: 'axis_read',
-        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal.',
+        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal. For a brainstorm record also its role, whether a seed is handed to you, and for a variant the rating and the remark of the person.',
         inputSchema: { type: 'object', properties: { project, id: recordId }, required: ['project', 'id'] },
         run(args) {
             const p = need(args, 'project');
@@ -89,12 +96,15 @@ const tools: Tool[] = [
     {
         name: 'axis_add',
         description:
-            'Add a record. Use the type that says what it is: a decision records what was chosen and why (put the reasoning in the text), a question is something not known yet, an idea is something to weigh, a task is work to do, an area groups records, a note is everything else.',
+            'Add a record. Use the type that says what it is: a decision records what was chosen and why (put the reasoning in the text), a question is something not known yet, an idea is something to weigh, a task is work to do, an area groups records, a note is everything else. ' +
+            'To run a brainstorm round: axis_overview shows a seed (an idea with role seed) marked "⏳ waits for Claude" when the person handed you the turn. Read the seed with axis_read, then add 1 to 10 ideas with role "variant" as children of the seed (parent = the seed id; only as many as are worth having, do not pad to ten), each a distinct option with its reasoning in the text. ' +
+            'Adding variants returns the turn to the person, who rates them (like, dislike, or both = disputed), may leave remarks, and hands the turn back. When the seed waits for you again, read the variants (axis_read shows ratings and remarks) and add one note with role "verdict" as a child of the seed: say what is liked, what is disliked, what is disputed and what to do next. Adding the verdict returns the turn to the person too; you cannot set ratings, remarks or the handed mark yourself.',
         inputSchema: {
             type: 'object',
             properties: {
                 project,
                 type: { type: 'string', enum: [...RECORD_TYPES] },
+                role: { type: 'string', enum: [...BRAIN_ROLES], description: ROLE_HELP },
                 title: str('One line.'),
                 parent: str('Id of the parent record (usually an area). Omit for the top level.'),
                 text: str(`The body. ${TEXT_HELP}`),
@@ -106,7 +116,8 @@ const tools: Tool[] = [
             required: ['project', 'type', 'title'],
         },
         run(args) {
-            const record = store.createRecord(need(args, 'project'), args as RecordInput, BY);
+            const { brain: _brain, ...input } = args; // only `role`: the person rates and hands the turn over
+            const record = store.createRecord(need(args, 'project'), input as RecordInput, BY);
             return `Added [${record.id}] ${record.type}  ${record.title}`;
         },
     },
@@ -120,6 +131,7 @@ const tools: Tool[] = [
                 id: recordId,
                 title: str('New title.'),
                 type: { type: 'string', enum: [...RECORD_TYPES] },
+                role: { type: 'string', enum: [...BRAIN_ROLES, ''], description: `${ROLE_HELP} An empty string clears the role.` },
                 status: { type: 'string', enum: [...STATUSES] },
                 text: str(`The new body, replacing the old one. ${TEXT_HELP}`),
                 due: str('A day YYYY-MM-DD; an empty string clears it.'),
@@ -130,7 +142,7 @@ const tools: Tool[] = [
             required: ['project', 'id'],
         },
         run(args) {
-            const { project: _p, id: _id, ...patch } = args;
+            const { project: _p, id: _id, brain: _brain, ...patch } = args;
             const record = store.updateRecord(need(args, 'project'), need(args, 'id'), patch as RecordInput, BY);
             return `Updated [${record.id}] ${record.type}·${record.status}  ${record.title}`;
         },
@@ -201,7 +213,8 @@ const tools: Tool[] = [
 const INSTRUCTIONS =
     'Axis is the design space the user and Claude share: projects as trees of typed records (area, task, idea, decision, question, note) with statuses, links and a journal. ' +
     'When working on a project that is in Axis: read axis_overview first, keep statuses true as work moves, record decisions with their reasons as "decision" records, open questions as "question", ' +
-    'and leave an axis_log note at the end of a piece of work. The user sees every change live on the Axis page.';
+    'and leave an axis_log note at the end of a piece of work. The user sees every change live on the Axis page. ' +
+    'Brainstorm: a seed marked "⏳ waits for Claude" in axis_overview (or "round waits for Claude" in axis_projects) is the person\'s turn handed to you: offer 1-10 "variant" ideas under it, and after the person rated them add one "verdict" note under the seed (see axis_add).';
 
 interface Request {
     jsonrpc?: string;

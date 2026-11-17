@@ -7,12 +7,13 @@
  */
 import { computed, reactive } from 'vue';
 import type { Doc } from '@1337exp/taoeditor/core';
-import type { AxisDraft, AxisProject, AxisRecord, ProjectSummary } from '@/core/model';
+import { buildThreads, ideaFromText, waitingSeeds } from '@/core/brainstorm';
+import type { AxisDraft, AxisProject, AxisRecord, Brain, ProjectSummary } from '@/core/model';
 import { buildTree, descendants, progressOfAll } from '@/core/tree';
 import { ApiError, api } from './api';
 import type { RecordPatch } from './api';
 
-export type View = 'tree' | 'board' | 'timeline' | 'map' | 'journal';
+export type View = 'tree' | 'board' | 'timeline' | 'map' | 'brainstorm' | 'journal';
 
 export const state = reactive({
     /** The first load is over (with or without success). / Первая загрузка закончена. */
@@ -34,6 +35,9 @@ export const state = reactive({
 
 export const tree = computed(() => buildTree(state.records));
 export const progress = computed(() => progressOfAll(state.records));
+/** The threads of the brainstorm and how many rounds wait for Claude. / Нити брейншторма и сколько раундов ждут Claude. */
+export const threads = computed(() => buildThreads(state.records));
+export const waiting = computed(() => waitingSeeds(state.records).length);
 export const selectedRecord = computed(() => state.records.find((r) => r.id === state.selected) ?? null);
 export const recordById = (id: string): AxisRecord | undefined => state.records.find((r) => r.id === id);
 const draftIds = computed(() => new Set(state.drafts));
@@ -57,11 +61,13 @@ let treeSelected: string | null = null;
 // #/<project>/~timeline/<record>   the timeline with that record open in the drawer
 // #/<project>/~map                 the map
 // #/<project>/~map/<record>        the map with that record open in the drawer
+// #/<project>/~brainstorm          the brainstorm: threads of rounds
+// #/<project>/~brainstorm/<record> the brainstorm with that record open in the drawer
 // #/<project>/~journal          the journal
 // The view is part of the address, so a reload brings back the same screen. / Вид входит в адрес: после перезагрузки тот же экран.
 
 /** The views that open a record in a drawer and name it in the address after the view. / Виды, которые открывают запись в панели и называют её в адресе после вида. */
-const DRAWER_VIEWS = ['board', 'timeline', 'map'] as const;
+const DRAWER_VIEWS = ['board', 'timeline', 'map', 'brainstorm'] as const;
 
 function readHash(): { project: string; record: string | null; view: View } {
     const [project = '', rest = '', third = ''] = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/');
@@ -75,7 +81,7 @@ function writeHash(): void {
     const tail =
         state.view === 'journal'
             ? '/~journal'
-            : state.view === 'board' || state.view === 'timeline' || state.view === 'map'
+            : state.view === 'board' || state.view === 'timeline' || state.view === 'map' || state.view === 'brainstorm'
               ? `/~${state.view}${state.selected ? `/${state.selected}` : ''}`
               : state.selected
                 ? `/${state.selected}`
@@ -184,6 +190,27 @@ export async function addRecord(input: RecordPatch & { title: string }): Promise
     put(record);
     return record;
 }
+
+/**
+ * A new idea from typed text: a top-level `idea` with the role `seed` (or a child of `parent`), the first line as the
+ * title and the text as the body. `handed` gives the turn to Claude at once (a reply to a verdict does).
+ * Новая задумка из набранного текста: `idea` верхнего уровня с ролью `seed` (или ребёнок `parent`), первая строка это
+ * заголовок, текст это тело. `handed` сразу передаёт ход Claude (так делает ответ на вердикт).
+ */
+export async function addSeed(text: string, options: { parent?: string; handed?: boolean } = {}): Promise<AxisRecord | null> {
+    const idea = ideaFromText(text);
+    if (!idea) return null;
+    return addRecord({
+        type: 'idea',
+        title: idea.title,
+        ...(idea.text === null ? {} : { text: idea.text }),
+        ...(options.parent ? { parent: options.parent } : {}),
+        brain: { role: 'seed', ...(options.handed ? { handed: true } : {}) },
+    });
+}
+
+/** Changes the brainstorm fields of a record: only the keys passed. / Меняет поля брейншторма записи: только переданные ключи. */
+export const patchBrain = (id: string, brain: Partial<Brain>): Promise<AxisRecord> => patchRecord(id, { brain });
 
 export async function patchRecord(id: string, patch: RecordPatch): Promise<AxisRecord> {
     try {

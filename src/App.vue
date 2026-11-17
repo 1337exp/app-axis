@@ -15,11 +15,12 @@ import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLoader, Tao
 import type { TaoMenuItem, TaoNavItem } from '@1337exp/taoui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ui } from '@/app/ui';
-import { openProject, setView, start, state, progress } from '@/app/state';
+import { openProject, setView, start, state, progress, waiting } from '@/app/state';
 import type { View } from '@/app/state';
 import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
 import BoardPane from '@/ui/BoardPane.vue';
+import BrainPane from '@/ui/BrainPane.vue';
 import JournalPane from '@/ui/JournalPane.vue';
 import MapPane from '@/ui/MapPane.vue';
 import NewProjectDialog from '@/ui/NewProjectDialog.vue';
@@ -71,6 +72,7 @@ const items = computed<TaoNavItem[]>(() => [
     { id: 'board', label: t('view.board'), icon: 'board', ...(progress.value.active > 0 ? { badge: progress.value.active } : {}) },
     { id: 'timeline', label: t('view.timeline'), icon: 'timeline' },
     { id: 'map', label: t('view.map'), icon: 'map' },
+    { id: 'brainstorm', label: t('view.brainstorm'), icon: 'brainstorm', ...(waiting.value > 0 ? { badge: waiting.value } : {}) },
     { id: 'journal', label: t('view.journal'), icon: 'journal' },
 ]);
 
@@ -187,6 +189,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
                 <BoardPane v-else-if="state.view === 'board'" />
                 <TimelinePane v-else-if="state.view === 'timeline'" />
                 <MapPane v-else-if="state.view === 'map'" />
+                <BrainPane v-else-if="state.view === 'brainstorm'" />
 
                 <TaoSplit v-else v-model="split" class="app__split" :min="22" :max="70">
                     <template #start><TreePane /></template>

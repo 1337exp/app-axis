@@ -4,13 +4,14 @@
  *
  * Журнал: кто, что, когда и почему изменил. Это память проекта: строка на изменение, только дописывается.
  */
+import { ratingOf } from './brainstorm.ts';
 import type { Author, AxisRecord } from './model.ts';
 import { docToText } from './text.ts';
 
 export type JournalKind = 'create' | 'update' | 'delete' | 'note';
 
 /** The fields whose change is worth a line. / Поля, изменение которых стоит строки. */
-export type TrackedField = 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images';
+export type TrackedField = 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images' | 'role' | 'rating' | 'remark' | 'handed';
 
 export interface JournalEntry {
     /** When, ISO. / Когда. */
@@ -49,7 +50,28 @@ export function diffRecord(before: AxisRecord, after: AxisRecord): JournalEntry[
     if (docToText(before.body) !== docToText(after.body) || JSON.stringify(before.body) !== JSON.stringify(after.body)) changes.body = ['', ''];
     if (linksText(before) !== linksText(after)) changes.links = [linksText(before), linksText(after)];
     if (before.images.join(' ') !== after.images.join(' ')) changes.images = [String(before.images.length), String(after.images.length)];
+    brainChanges(before, after, changes);
     return Object.keys(changes).length > 0 ? changes : undefined;
+}
+
+/**
+ * The brainstorm fields as short values: `role` (seed, variant, verdict or empty), `rating` (good, bad, disputed, neutral;
+ * empty when the record is not a variant), `remark` (cut short), `handed` (`yes` or empty: the turn is with Claude).
+ * Поля брейншторма короткими значениями: `role` (seed, variant, verdict или пусто), `rating` (good, bad, disputed, neutral;
+ * пусто, если запись не вариант), `remark` (обрезана), `handed` (`yes` или пусто: ход у Claude).
+ */
+function brainChanges(before: AxisRecord, after: AxisRecord, changes: NonNullable<JournalEntry['changes']>): void {
+    const rating = (r: AxisRecord): string => (r.brain?.role === 'variant' ? ratingOf(r) : '');
+    const cut = (text: string): string => (text.length > 60 ? `${text.slice(0, 59)}…` : text);
+    const handed = (r: AxisRecord): string => (r.brain?.handed ? 'yes' : '');
+    const pairs: [Exclude<TrackedField, 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images'>, string, string][] = [
+        ['role', before.brain?.role ?? '', after.brain?.role ?? ''],
+        ['rating', rating(before), rating(after)],
+        ['remark', before.brain?.remark ?? '', after.brain?.remark ?? ''],
+        ['handed', handed(before), handed(after)],
+    ];
+    // compared whole, shown cut: a change past the cut is still a change
+    for (const [field, was, now] of pairs) if (was !== now) changes[field] = field === 'remark' ? [cut(was), cut(now)] : [was, now];
 }
 
 /** A line of the journal file → an entry, or null for a broken line. / Строка файла журнала → запись или null. */

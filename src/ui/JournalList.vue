@@ -6,7 +6,7 @@
 import { computed } from 'vue';
 import { recordById, select } from '@/app/state';
 import type { JournalEntry, TrackedField } from '@/core/journal';
-import { isRecordType, isStatus } from '@/core/model';
+import { isBrainRole, isRecordType, isStatus } from '@/core/model';
 import type { RecordType } from '@/core/model';
 import { current, useI18n } from '@/i18n';
 import { dayOf, formatDay, formatShort, formatTime, today, yesterday } from './format';
@@ -41,6 +41,10 @@ function value(field: TrackedField, raw: string, entry: JournalEntry): string {
     if (field === 'type' && isRecordType(raw)) return t(`type.${raw}`);
     if (field === 'parent') return recordById(raw)?.title ?? raw;
     if (field === 'due') return formatShort(raw, current.value);
+    // the brainstorm values in words: the part, the rating, the turn / значения брейншторма словами: роль, оценка, ход
+    if (field === 'role' && isBrainRole(raw)) return t(`brain.role.${raw}`);
+    if (field === 'rating' && (raw === 'good' || raw === 'bad' || raw === 'disputed' || raw === 'neutral')) return t(`brain.rating.${raw}`);
+    if (field === 'handed' && raw === 'yes') return t('journal.yes');
     return raw;
 }
 
