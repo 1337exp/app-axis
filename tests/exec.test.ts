@@ -187,3 +187,33 @@ describe('exec through the MCP server', () => {
         expect(createStore(root).record('demo', id).exec).toBeNull();
     });
 });
+
+describe('links through the MCP server', () => {
+    let root: string;
+    beforeEach(() => {
+        root = mkdtempSync(join(tmpdir(), 'axis-links-mcp-'));
+        createStore(root).createProject({ title: 'Demo', id: 'demo' });
+    });
+    afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+    const call = (calls: { name: string; arguments: Record<string, unknown> }[]): string[] => {
+        const input = calls.map((params, i) => JSON.stringify({ jsonrpc: '2.0', id: i + 1, method: 'tools/call', params })).join('\n');
+        const run = spawnSync(process.execPath, [join(process.cwd(), 'server', 'mcp.ts')], { input: `${input}\n`, env: { ...process.env, AXIS_DATA: root }, encoding: 'utf8' });
+        return run.stdout.trim().split('\n').map((l) => (JSON.parse(l) as { result: { content: { text: string }[] } }).result.content[0]!.text);
+    };
+
+    it('links a record when it is added and shows both ends in the overview', () => {
+        const [decision] = call([{ name: 'axis_add', arguments: { project: 'demo', type: 'decision', title: 'Zip' } }]);
+        const d = /\[(\w{8})\]/.exec(decision!)![1]!;
+        const [task, bad, overview] = call([
+            { name: 'axis_add', arguments: { project: 'demo', type: 'task', title: 'Write it', links: [{ to: d, kind: 'because' }] } },
+            { name: 'axis_add', arguments: { project: 'demo', type: 'task', title: 'Broken', links: 'nope' } },
+            { name: 'axis_overview', arguments: { project: 'demo' } },
+        ]);
+        const t = /\[(\w{8})\]/.exec(task!)![1]!;
+        expect(bad).toContain('links');
+        expect(overview).toContain(`[${t}] task·open  Write it  → because:${d}`);
+        expect(overview).toContain(`[${d}] decision·done  Zip  ← because:${t}`);
+        expect(overview).not.toContain('Broken');
+    });
+});

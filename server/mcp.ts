@@ -38,7 +38,17 @@ const ROLE_HELP =
 const MODEL_HELP =
     'For a task: a recommendation of who should do it. "haiku" for trivial and mechanical work, "sonnet" for most implementation, "opus" for hard design or risky work. Set it when you create a task and keep it honest: change it when the task turns out harder or easier.';
 const EFFORT_HELP = 'For a task: how hard the executor should think, "low", "medium" or "high" (a recommendation too).';
-const WHY_HELP = 'Why this change is made, one or two sentences. Goes to the journal: it is the memory of the project, so give it whenever the reason is not obvious.';
+const LINKS_HELP = {
+    type: 'array',
+    description:
+        'Links of the new record, made in the same call: [{ "to": id, "kind": "because" | "depends" | "relates" }]. "because": the target is the reason (a task made from a decision, a decision made from a question); "depends": this record waits for the target; "relates": just near. Give them when you create the record: a link in the text as [id] is not a link. To add or remove one later use axis_link.',
+    items: {
+        type: 'object',
+        properties: { to: recordId, kind: { type: 'string', enum: [...LINK_KINDS] } },
+        required: ['to', 'kind'],
+    },
+};
+const WHY_HELP ='Why this change is made, one or two sentences. Goes to the journal: it is the memory of the project, so give it whenever the reason is not obvious.';
 
 const need = (args: Args, key: string): string => {
     const value = args[key];
@@ -79,7 +89,7 @@ const tools: Tool[] = [
     {
         name: 'axis_overview',
         description:
-            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set).',
+            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set). Links: "→ because:id" this record links to that one (kinds: because = it exists for that reason, depends = it waits for it, relates = near), "← because:id" that record links to this one; a decision with no "←" has nothing built on it yet.',
         inputSchema: { type: 'object', properties: { project, record: str('Optional: show only the branch under this record.') }, required: ['project'] },
         run(args) {
             const id = need(args, 'project');
@@ -116,6 +126,7 @@ const tools: Tool[] = [
                 status: { type: 'string', enum: [...STATUSES], description: 'Default: open (done for a decision).' },
                 due: str('A day YYYY-MM-DD.'),
                 after: str('Put it after this sibling; by default it goes last.'),
+                links: LINKS_HELP,
                 why: str(WHY_HELP),
             },
             required: ['project', 'type', 'title'],
@@ -221,6 +232,8 @@ const INSTRUCTIONS =
     'Axis is the design space the user and Claude share: projects as trees of typed records (area, task, idea, decision, question, note) with statuses, links and a journal. ' +
     'When working on a project that is in Axis: read axis_overview first, keep statuses true as work moves, record decisions with their reasons as "decision" records, open questions as "question", ' +
     'and leave an axis_log note at the end of a piece of work. The user sees every change live on the Axis page. ' +
+    'Link records as you make them, not only mention an [id] in the text: a task made from a decision or a decision made from a question gets "because", a record that waits for another gets "depends", close records get "relates" ' +
+    '(pass "links" to axis_add, or use axis_link later); axis_overview shows them as "→" (this record links to) and "←" (linked to this record). ' +
     'Brainstorm: a seed marked "⏳ waits for Claude" in axis_overview (or "round waits for Claude" in axis_projects) is the person\'s turn handed to you: offer 1-10 "variant" ideas under it, and after the person rated them add one "verdict" note under the seed (see axis_add).';
 
 interface Request {

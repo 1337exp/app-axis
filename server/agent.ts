@@ -35,7 +35,16 @@ export function brainMark(r: AxisRecord): string {
     return 'verdict';
 }
 
-function line(node: TreeNode): string {
+/** Who links to whom: target id → the links that point at it (as `from`). / Кто на кого ссылается: цель → ссылки на неё. */
+function incomingOf(records: readonly AxisRecord[]): Map<string, { from: string; kind: string }[]> {
+    const map = new Map<string, { from: string; kind: string }[]>();
+    for (const r of records) {
+        for (const l of r.links) map.set(l.to, [...(map.get(l.to) ?? []), { from: r.id, kind: l.kind }]);
+    }
+    return map;
+}
+
+function line(node: TreeNode, incoming: ReadonlyMap<string, { from: string; kind: string }[]>): string {
     const r = node.record;
     const kind = hasStatus(r.type) ? `${r.type}·${r.status}` : r.type;
     const parts = [`[${r.id}] ${kind}  ${r.title}`];
@@ -47,6 +56,8 @@ function line(node: TreeNode): string {
     if (r.body) parts.push('¶');
     if (r.images.length > 0) parts.push(`🖼${r.images.length}`);
     for (const link of r.links) parts.push(`→ ${link.kind}:${link.to}`);
+    // who points at this record (`← because:ab12cd34`: that record is here because of this one) / кто ссылается на эту запись
+    for (const link of incoming.get(r.id) ?? []) parts.push(`← ${link.kind}:${link.from}`);
     const mark = brainMark(r);
     if (mark) parts.push(mark);
     // the recommended executor of a task: `⚙ sonnet/high`, `⚙ sonnet` (no effort set), `⚙ /high` (no model set) / рекомендованный исполнитель задачи
@@ -54,13 +65,17 @@ function line(node: TreeNode): string {
     return `${'  '.repeat(node.depth)}- ${parts.join('  ')}`;
 }
 
-/** The whole project as an outline. `¶` marks a record that has a text. / Весь проект оглавлением; `¶` значит, что у записи есть текст. */
+/**
+ * The whole project as an outline. `¶` marks a record that has a text; `→ kind:id` a link the record makes, `← kind:id` a link
+ * made to it. / Весь проект оглавлением; `¶` значит, что у записи есть текст; `→ вид:id` связь от записи, `← вид:id` связь к ней.
+ */
 export function outlineText(project: AxisProject, records: readonly AxisRecord[], root?: string): string {
     const tree = buildTree(records);
+    const incoming = incomingOf(records);
     const lines: string[] = [];
     const walk = (nodes: readonly TreeNode[]): void => {
         for (const node of nodes) {
-            lines.push(line(node));
+            lines.push(line(node, incoming));
             walk(node.children);
         }
     };

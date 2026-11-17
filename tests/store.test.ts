@@ -292,7 +292,10 @@ describe('what the agent sees', () => {
         expect(outline).toContain(`- [${area.id}] area  Редактор  (1/2)`);
         expect(outline).toContain(`  - [${d.id}] decision·done  Проект это zip  ¶`);
         expect(outline).toContain(`  - [${t.id}] task·done  Формат файла  due 2026-11-20  → because:${d.id}`);
+        expect(outline).toContain(`  - [${d.id}] decision·done  Проект это zip  ¶  ← because:${t.id}`);
         expect(outlineText(store.project('demo'), records, t.id)).toContain(`\n- [${t.id}] task·done`);
+        // a branch printed alone still shows the links made from outside of it
+        expect(outlineText(store.project('demo'), records, d.id)).toContain(`← because:${t.id}`);
         const text = recordText(store.record('demo', d.id), records, store.journal('demo', { record: d.id }), (n) => n);
         expect(text).toContain('in: Редактор');
         expect(text).toContain(`← because from [${t.id}] Формат файла`);
