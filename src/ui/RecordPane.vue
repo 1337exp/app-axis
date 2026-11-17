@@ -24,8 +24,8 @@ import { ApiError, api } from '@/app/api';
 import type { RecordPatch } from '@/app/api';
 import { countInside, dropDraft, hasDraft, loadDraft, patchRecord, recordById, removeRecord, select, selectedRecord, state, writeDraft } from '@/app/state';
 import type { JournalEntry } from '@/core/journal';
-import { LINK_KINDS, STATUSES, hasStatus } from '@/core/model';
-import type { AxisDraft, AxisRecord, LinkKind, RecordType, Status } from '@/core/model';
+import { EXEC_EFFORTS, EXEC_MODELS, LINK_KINDS, STATUSES, hasStatus, isExecEffort, isExecModel } from '@/core/model';
+import type { AxisDraft, AxisRecord, ExecEffort, ExecModel, LinkKind, RecordType, Status } from '@/core/model';
 import { pathOf } from '@/core/tree';
 import { LOCALES, current, useI18n } from '@/i18n';
 import { formatDay, formatTime, dayOf } from './format';
@@ -330,6 +330,18 @@ const status = computed({
     get: () => record.value?.status ?? 'open',
     set: (value: Status) => record.value && value !== record.value.status && void save(record.value.id, { status: value }),
 });
+// the recommended executor of a task: two selects, saved at once like the status ('' is "not set") / рекомендованный исполнитель задачи: два выбора, сохраняются сразу, как статус ('' значит «не задан»)
+const execModel = computed({
+    get: () => record.value?.exec?.model ?? '',
+    set: (value: string) => record.value && value !== (record.value.exec?.model ?? '') && (value === '' || isExecModel(value)) && void save(record.value.id, { exec: { model: value === '' ? null : (value as ExecModel) } }),
+});
+const execEffort = computed({
+    get: () => record.value?.exec?.effort ?? '',
+    set: (value: string) => record.value && value !== (record.value.exec?.effort ?? '') && (value === '' || isExecEffort(value)) && void save(record.value.id, { exec: { effort: value === '' ? null : (value as ExecEffort) } }),
+});
+const modelOptions = computed(() => [{ value: '', label: t('exec.none') }, ...EXEC_MODELS.map((value) => ({ value, label: t(`exec.model.${value}`) }))]);
+const effortOptions = computed(() => [{ value: '', label: t('exec.noneEffort') }, ...EXEC_EFFORTS.map((value) => ({ value, label: t(`exec.level.${value}`) }))]);
+
 const due = computed({
     get: () => record.value?.due ?? null,
     set: (value: string | null) => record.value && value !== record.value.due && void save(record.value.id, { due: value }),
@@ -511,6 +523,10 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                 </TaoSegmentedOption>
             </TaoSegmented>
             <TaoDate v-model="due" class="record__due" :placeholder="t('record.due')" :today-text="t('record.today')" :clear-text="t('record.dueClear')" :aria-label="t('record.due')" />
+            <template v-if="record.type === 'task'">
+                <label class="record__exec"><span class="record__exec-label">{{ t('exec.executor') }}</span><TaoSelect v-model="execModel" :options="modelOptions" :clearable="false" size="small" :aria-label="t('exec.executor')" /></label>
+                <label class="record__exec"><span class="record__exec-label">{{ t('exec.effort') }}</span><TaoSelect v-model="execEffort" :options="effortOptions" :clearable="false" size="small" :aria-label="t('exec.effort')" /></label>
+            </template>
         </div>
 
         <section class="block block--text">
@@ -738,6 +754,21 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 
 .record__due {
     width: 170px;
+}
+
+.record__exec {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--tao-space-2);
+}
+
+.record__exec-label {
+    color: var(--tao-color-text-muted);
+    font-size: var(--tao-font-size-xs);
+}
+
+.record__exec :deep(.tao-select) {
+    min-width: 130px;
 }
 
 .block {

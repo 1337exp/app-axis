@@ -5,13 +5,14 @@
  * Журнал: кто, что, когда и почему изменил. Это память проекта: строка на изменение, только дописывается.
  */
 import { ratingOf } from './brainstorm.ts';
+import { execText } from './model.ts';
 import type { Author, AxisRecord } from './model.ts';
 import { docToText } from './text.ts';
 
 export type JournalKind = 'create' | 'update' | 'delete' | 'note';
 
 /** The fields whose change is worth a line. / Поля, изменение которых стоит строки. */
-export type TrackedField = 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images' | 'role' | 'rating' | 'remark' | 'handed';
+export type TrackedField = 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images' | 'role' | 'rating' | 'remark' | 'handed' | 'exec';
 
 export interface JournalEntry {
     /** When, ISO. / Когда. */
@@ -51,6 +52,8 @@ export function diffRecord(before: AxisRecord, after: AxisRecord): JournalEntry[
     if (linksText(before) !== linksText(after)) changes.links = [linksText(before), linksText(after)];
     if (before.images.join(' ') !== after.images.join(' ')) changes.images = [String(before.images.length), String(after.images.length)];
     brainChanges(before, after, changes);
+    // the recommended executor as `sonnet/high` / рекомендованный исполнитель как `sonnet/high`
+    if (execText(before.exec) !== execText(after.exec)) changes.exec = [execText(before.exec), execText(after.exec)];
     return Object.keys(changes).length > 0 ? changes : undefined;
 }
 
@@ -64,7 +67,7 @@ function brainChanges(before: AxisRecord, after: AxisRecord, changes: NonNullabl
     const rating = (r: AxisRecord): string => (r.brain?.role === 'variant' ? ratingOf(r) : '');
     const cut = (text: string): string => (text.length > 60 ? `${text.slice(0, 59)}…` : text);
     const handed = (r: AxisRecord): string => (r.brain?.handed ? 'yes' : '');
-    const pairs: [Exclude<TrackedField, 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images'>, string, string][] = [
+    const pairs: [Exclude<TrackedField, 'title' | 'type' | 'status' | 'parent' | 'due' | 'body' | 'links' | 'images' | 'exec'>, string, string][] = [
         ['role', before.brain?.role ?? '', after.brain?.role ?? ''],
         ['rating', rating(before), rating(after)],
         ['remark', before.brain?.remark ?? '', after.brain?.remark ?? ''],

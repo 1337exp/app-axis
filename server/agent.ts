@@ -7,7 +7,7 @@
  */
 import { ratingOf } from '../src/core/brainstorm.ts';
 import type { JournalEntry } from '../src/core/journal.ts';
-import { hasStatus } from '../src/core/model.ts';
+import { execText, hasStatus } from '../src/core/model.ts';
 import type { AxisProject, AxisRecord } from '../src/core/model.ts';
 import { fold, matchesWords } from '../src/core/search.ts';
 import { docToText, preview } from '../src/core/text.ts';
@@ -49,6 +49,8 @@ function line(node: TreeNode): string {
     for (const link of r.links) parts.push(`→ ${link.kind}:${link.to}`);
     const mark = brainMark(r);
     if (mark) parts.push(mark);
+    // the recommended executor of a task: `⚙ sonnet/high`, `⚙ sonnet` (no effort set), `⚙ /high` (no model set) / рекомендованный исполнитель задачи
+    if (r.exec) parts.push(`⚙ ${execText(r.exec)}`);
     return `${'  '.repeat(node.depth)}- ${parts.join('  ')}`;
 }
 
@@ -108,6 +110,7 @@ export function recordText(record: AxisRecord, records: readonly AxisRecord[], j
     const out = [`[${record.id}] ${hasStatus(record.type) ? `${record.type}·${record.status}` : record.type}  ${record.title}`];
     if (path) out.push(`in: ${path}`);
     if (record.due) out.push(`due: ${record.due}`);
+    if (record.exec) out.push(`executor: ${[record.exec.model, record.exec.effort ? `effort ${record.exec.effort}` : ''].filter(Boolean).join(', ')}`);
     const b = record.brain;
     if (b?.role === 'seed') out.push(`brainstorm: seed${b.handed ? ', handed: it is your turn (offer variants, or add a verdict once they are rated)' : ''}`);
     else if (b?.role === 'variant') {

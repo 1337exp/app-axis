@@ -47,6 +47,13 @@ const items = computed<TaoMenuItem[]>(() =>
     })),
 );
 
+/** `Sonnet · High`: the recommended executor and effort of a task, plain text, no colour. / Рекомендованный исполнитель и усилие задачи простым текстом, без цвета. */
+const execChip = computed(() => {
+    const e = props.record.exec;
+    if (!e) return '';
+    return [e.model ? t(`exec.model.${e.model}`) : '', e.effort ? t(`exec.level.${e.effort}`).toLowerCase() : ''].filter(Boolean).join(' · ');
+});
+
 const onSelect = (id: string): void => {
     const status = STATUSES.find((s) => s === id);
     if (status && status !== props.record.status) emit('status', status);
@@ -64,7 +71,8 @@ const onSelect = (id: string): void => {
             </template>
         </TaoDropdownMenu>
         <span v-if="path.length > 0" class="card__path" :title="path.join(' / ')">{{ path.join(' / ') }}</span>
-        <span v-if="record.due || record.updatedBy === 'claude' || draft" class="card__meta">
+        <span v-if="record.due || record.updatedBy === 'claude' || draft || execChip" class="card__meta">
+            <span v-if="execChip" class="card__exec" :title="t('exec.chipTitle')">{{ execChip }}</span>
             <span v-if="record.due" class="card__due" :class="{ 'card__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
             <TaoIcon v-if="draft" class="card__draft" name="tao-edit" :title="t('tree.hasDraft')" />
             <ClaudeMark v-if="record.updatedBy === 'claude'" />
@@ -162,6 +170,11 @@ const onSelect = (id: string): void => {
     align-items: center;
     gap: var(--tao-space-2);
     font-size: var(--tao-font-size-xs);
+}
+
+.card__exec {
+    color: var(--tao-color-text-muted);
+    white-space: nowrap;
 }
 
 .card__due {

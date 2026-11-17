@@ -93,6 +93,43 @@ export function normalizeBrain(raw: unknown): Brain | null {
     };
 }
 
+/**
+ * Who should do a task and how hard to think: a recommendation, not a command. Claude sets it when it breaks work down,
+ * the person may change it. `haiku` is for trivial and mechanical work, `sonnet` for most implementation, `opus` for hard
+ * design or risky work.
+ *
+ * Кто должен делать задачу и как усердно думать: рекомендация, не приказ. Claude ставит её при разборе работы,
+ * человек может поправить. `haiku` для простого и механического, `sonnet` для большей части реализации, `opus` для
+ * трудного проектирования и рискованной работы.
+ */
+export const EXEC_MODELS = ['haiku', 'sonnet', 'opus'] as const;
+export type ExecModel = (typeof EXEC_MODELS)[number];
+export const EXEC_EFFORTS = ['low', 'medium', 'high'] as const;
+export type ExecEffort = (typeof EXEC_EFFORTS)[number];
+
+export interface Exec {
+    model: ExecModel | null;
+    effort: ExecEffort | null;
+}
+
+export const isExecModel = (value: unknown): value is ExecModel => EXEC_MODELS.includes(value as ExecModel);
+export const isExecEffort = (value: unknown): value is ExecEffort => EXEC_EFFORTS.includes(value as ExecEffort);
+
+/**
+ * An exec field made valid: a part that is not one of the known words is dropped; with both parts empty it is null.
+ * Поле exec приводится к верному: часть с чужим словом отбрасывается; когда обе части пусты, это null.
+ */
+export function normalizeExec(raw: unknown): Exec | null {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+    const e = raw as Record<string, unknown>;
+    const model = isExecModel(e.model) ? e.model : null;
+    const effort = isExecEffort(e.effort) ? e.effort : null;
+    return model === null && effort === null ? null : { model, effort };
+}
+
+/** An exec as a short value: `sonnet/high`, `sonnet` (no effort), `/high` (no model), '' (none). / Exec короткой строкой. */
+export const execText = (exec: Exec | null | undefined): string => (exec ? `${exec.model ?? ''}${exec.effort ? `/${exec.effort}` : ''}` : '');
+
 export interface AxisRecord {
     v: typeof RECORD_VERSION;
     id: string;
@@ -117,6 +154,13 @@ export interface AxisRecord {
      * поэтому у записи из хранилища оно есть; необязательно оно только для кода, собирающего запись руками.
      */
     brain?: Brain | null;
+    /**
+     * The recommended executor of a task, or null/absent. Only a `task` has one: `normalizeRecord` drops it from other
+     * types and always sets it (null when none); it is optional only for code that builds a record by hand.
+     * Рекомендованный исполнитель задачи или null/нет поля. Он только у `task`: `normalizeRecord` убирает его у других
+     * типов и задаёт всегда (null, если нет); необязательно оно только для кода, собирающего запись руками.
+     */
+    exec?: Exec | null;
     created: string;
     updated: string;
     createdBy: Author;
@@ -228,6 +272,7 @@ export function normalizeRecord(raw: unknown, now: string): AxisRecord | null {
         due: isDay(r.due) ? r.due : null,
         images: Array.isArray(r.images) ? [...new Set(r.images.filter(isAssetName))] : [],
         brain: normalizeBrain(r.brain),
+        exec: type === 'task' ? normalizeExec(r.exec) : null,
         created: day(r.created),
         updated: day(r.updated),
         createdBy: isAuthor(r.createdBy) ? r.createdBy : 'user',

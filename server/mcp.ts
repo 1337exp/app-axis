@@ -11,7 +11,7 @@
  */
 import { createInterface } from 'node:readline';
 import { waitingSeeds } from '../src/core/brainstorm.ts';
-import { BRAIN_ROLES, LINK_KINDS, RECORD_TYPES, STATUSES, isLinkKind } from '../src/core/model.ts';
+import { BRAIN_ROLES, EXEC_EFFORTS, EXEC_MODELS, LINK_KINDS, RECORD_TYPES, STATUSES, isLinkKind } from '../src/core/model.ts';
 import { entryText, hitText, outlineText, recordText, search } from './agent.ts';
 import { dataDir } from './config.ts';
 import { AxisError, createStore } from './store.ts';
@@ -35,6 +35,9 @@ const TEXT_HELP =
     'Markdown (read and written as is, so what axis_read shows can be sent back unchanged): paragraphs split by an empty line, "# heading" (levels 1-3), **bold**, *italic*, ~~strikethrough~~, `inline code`, [label](https://url), "- item" and "1. item" lists (nested by indent), "> quote", ``` code blocks with a language, GFM tables. Nothing else is kept: no images, rules or task lists.';
 const ROLE_HELP =
     'Brainstorm role (optional): "seed" (the person\'s starting thought), "variant" (one option you offer under a seed), "verdict" (your summary under a seed after the variants were rated). Use it only inside a brainstorm round (see axis_add).';
+const MODEL_HELP =
+    'For a task: a recommendation of who should do it. "haiku" for trivial and mechanical work, "sonnet" for most implementation, "opus" for hard design or risky work. Set it when you create a task and keep it honest: change it when the task turns out harder or easier.';
+const EFFORT_HELP = 'For a task: how hard the executor should think, "low", "medium" or "high" (a recommendation too).';
 const WHY_HELP = 'Why this change is made, one or two sentences. Goes to the journal: it is the memory of the project, so give it whenever the reason is not obvious.';
 
 const need = (args: Args, key: string): string => {
@@ -76,7 +79,7 @@ const tools: Tool[] = [
     {
         name: 'axis_overview',
         description:
-            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict".',
+            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set).',
         inputSchema: { type: 'object', properties: { project, record: str('Optional: show only the branch under this record.') }, required: ['project'] },
         run(args) {
             const id = need(args, 'project');
@@ -85,7 +88,7 @@ const tools: Tool[] = [
     },
     {
         name: 'axis_read',
-        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal. For a brainstorm record also its role, whether a seed is handed to you, and for a variant the rating and the remark of the person.',
+        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal. For a task the recommended executor and effort. For a brainstorm record also its role, whether a seed is handed to you, and for a variant the rating and the remark of the person.',
         inputSchema: { type: 'object', properties: { project, id: recordId }, required: ['project', 'id'] },
         run(args) {
             const p = need(args, 'project');
@@ -96,7 +99,7 @@ const tools: Tool[] = [
     {
         name: 'axis_add',
         description:
-            'Add a record. Use the type that says what it is: a decision records what was chosen and why (put the reasoning in the text), a question is something not known yet, an idea is something to weigh, a task is work to do, an area groups records, a note is everything else. ' +
+            'Add a record. Use the type that says what it is: a decision records what was chosen and why (put the reasoning in the text), a question is something not known yet, an idea is something to weigh, a task is work to do, an area groups records, a note is everything else. When you create a task, say who should do it with "model" (haiku, sonnet or opus) and how hard to think with "effort" (low, medium or high): it is a recommendation for whoever picks the task up. ' +
             'To run a brainstorm round: axis_overview shows a seed (an idea with role seed) marked "⏳ waits for Claude" when the person handed you the turn. Read the seed with axis_read, then add 1 to 10 ideas with role "variant" as children of the seed (parent = the seed id; only as many as are worth having, do not pad to ten), each a distinct option with its reasoning in the text. ' +
             'Adding variants returns the turn to the person, who rates them (like, dislike, or both = disputed), may leave remarks, and hands the turn back. When the seed waits for you again, read the variants (axis_read shows ratings and remarks) and add one note with role "verdict" as a child of the seed: say what is liked, what is disliked, what is disputed and what to do next. Adding the verdict returns the turn to the person too; you cannot set ratings, remarks or the handed mark yourself.',
         inputSchema: {
@@ -105,6 +108,8 @@ const tools: Tool[] = [
                 project,
                 type: { type: 'string', enum: [...RECORD_TYPES] },
                 role: { type: 'string', enum: [...BRAIN_ROLES], description: ROLE_HELP },
+                model: { type: 'string', enum: [...EXEC_MODELS], description: MODEL_HELP },
+                effort: { type: 'string', enum: [...EXEC_EFFORTS], description: EFFORT_HELP },
                 title: str('One line.'),
                 parent: str('Id of the parent record (usually an area). Omit for the top level.'),
                 text: str(`The body. ${TEXT_HELP}`),
@@ -132,6 +137,8 @@ const tools: Tool[] = [
                 title: str('New title.'),
                 type: { type: 'string', enum: [...RECORD_TYPES] },
                 role: { type: 'string', enum: [...BRAIN_ROLES, ''], description: `${ROLE_HELP} An empty string clears the role.` },
+                model: { type: 'string', enum: [...EXEC_MODELS, ''], description: `${MODEL_HELP} An empty string clears it.` },
+                effort: { type: 'string', enum: [...EXEC_EFFORTS, ''], description: `${EFFORT_HELP} An empty string clears it.` },
                 status: { type: 'string', enum: [...STATUSES] },
                 text: str(`The new body, replacing the old one. ${TEXT_HELP}`),
                 due: str('A day YYYY-MM-DD; an empty string clears it.'),

@@ -30,14 +30,17 @@ import {
     isAuthor,
     isBrainRole,
     isDay,
+    isExecEffort,
+    isExecModel,
     isId,
     isLinkKind,
     isRecordType,
     isStatus,
     normalizeBrain,
+    normalizeExec,
     normalizeRecord,
 } from '../src/core/model.ts';
-import type { Author, AxisDraft, Brain, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
+import type { Author, AxisDraft, Brain, Exec, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
 import { isCamera, isPoint, normalizeMap, patchMap } from '../src/core/map.ts';
 import type { MapData, MapPatch } from '../src/core/map.ts';
 import { textToDoc } from '../src/core/text.ts';
@@ -88,6 +91,16 @@ export interface RecordInput {
      * от Claude берётся лишь `role`.
      */
     brain?: unknown;
+    /**
+     * The recommended executor of a task: `{ model?, effort? }`, partial (only the keys passed change); `null` clears the
+     * whole field, a key set to null or '' clears that part. Only a task keeps it. Both the person and Claude may set it.
+     * Рекомендованный исполнитель задачи: `{ model?, effort? }`, частично (меняются только переданные ключи); `null` снимает
+     * поле целиком, ключ null или '' снимает свою часть. Держит его только задача. Ставить могут и человек, и Claude.
+     */
+    exec?: unknown;
+    /** Shortcuts for `exec.model` and `exec.effort` (the agent's way); an empty string clears. / Короткие пути к `exec.model` и `exec.effort` (путь агента); пустая строка снимает. */
+    model?: unknown;
+    effort?: unknown;
     /** The reason: goes to the journal. / Причина: попадает в журнал. */
     why?: unknown;
     /**
@@ -310,6 +323,32 @@ export function createStore(root: string): Store {
         return normalizeBrain(patch);
     };
 
+    /** The exec field after a change: only the parts passed change; unknown words are refused. */
+    const execOf = (current: Exec | null, input: RecordInput): Exec | null => {
+        const { exec } = input;
+        if (exec !== undefined && exec !== null && (typeof exec !== 'object' || Array.isArray(exec))) throw new AxisError(400, '"exec" is { model?, effort? } or null');
+        const given = exec === undefined || exec === null ? {} : (exec as Record<string, unknown>);
+        let model = current?.model ?? null;
+        let effort = current?.effort ?? null;
+        if (exec === null) {
+            model = null;
+            effort = null;
+        }
+        const m = input.model !== undefined ? input.model : given.model;
+        const e = input.effort !== undefined ? input.effort : given.effort;
+        if (m !== undefined) {
+            if (m === null || m === '') model = null;
+            else if (isExecModel(m)) model = m;
+            else throw new AxisError(400, 'model: haiku | sonnet | opus (an empty string clears it)');
+        }
+        if (e !== undefined) {
+            if (e === null || e === '') effort = null;
+            else if (isExecEffort(e)) effort = e;
+            else throw new AxisError(400, 'effort: low | medium | high (an empty string clears it)');
+        }
+        return normalizeExec({ model, effort });
+    };
+
     /**
      * A verdict (or a variant) added under a seed passes the turn back to the person: the seed's `handed` is cleared, with
      * a line in the journal. A variant does it too, or the seed would keep saying "waits for Claude" while the person rates.
@@ -406,6 +445,7 @@ export function createStore(root: string): Store {
             if (parent !== null && (!isId(parent) || !all.some((r) => r.id === parent))) throw new AxisError(404, `No parent record "${String(parent)}"`);
             if (input.due !== undefined && input.due !== null && !isDay(input.due)) throw new AxisError(400, 'due is a day YYYY-MM-DD');
             const brain = brainOf(null, input, by);
+            const exec = execOf(null, input); // checked for any type, kept by a task only
             let id = newId();
             while (all.some((r) => r.id === id)) id = newId();
             const after = input.after === null ? null : isId(input.after) ? input.after : undefined;
@@ -423,6 +463,7 @@ export function createStore(root: string): Store {
                 due: isDay(input.due) ? input.due : null,
                 images: input.images === undefined ? [] : imagesOf(input.images, project),
                 brain,
+                exec: type === 'task' ? exec : null,
                 created: stamp,
                 updated: stamp,
                 createdBy: by,
@@ -466,6 +507,8 @@ export function createStore(root: string): Store {
             if (input.links !== undefined) after.links = linksOf(input.links, id, all);
             if (input.images !== undefined) after.images = imagesOf(input.images, project);
             if (input.role !== undefined || input.brain !== undefined) after.brain = brainOf(before.brain ?? null, input, by);
+            if (input.exec !== undefined || input.model !== undefined || input.effort !== undefined) after.exec = execOf(before.exec ?? null, input);
+            if (after.type !== 'task') after.exec = null; // only a task has an executor / исполнитель только у задачи
             const reparent = input.parent !== undefined;
             if (reparent) {
                 const parent = input.parent === null || input.parent === '' ? null : input.parent;

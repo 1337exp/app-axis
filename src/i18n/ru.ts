@@ -74,6 +74,15 @@ export default {
         cardActions: 'Статус записи',
         status: { open: 'Не начато', active: 'В работе', done: 'Готово', dropped: 'Отброшено' },
     },
+    exec: {
+        executor: 'Исполнитель',
+        effort: 'Усилие',
+        none: 'Не задан',
+        noneEffort: 'Не задано',
+        model: { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus' },
+        level: { low: 'Низкое', medium: 'Среднее', high: 'Высокое' },
+        chipTitle: 'Рекомендованный исполнитель и усилие',
+    },
     brain: {
         label: 'Брейншторм',
         newIdea: 'Новая задумка',
@@ -283,6 +292,7 @@ export default {
             rating: 'оценка',
             remark: 'заметка',
             handed: 'ход у Claude',
+            exec: 'исполнитель',
         },
         yes: 'да',
         was: 'было «{0}»',

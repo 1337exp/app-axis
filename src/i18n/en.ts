@@ -76,6 +76,15 @@ const en: typeof ru = {
         cardActions: 'Record status',
         status: { open: 'Not started', active: 'In work', done: 'Done', dropped: 'Dropped' },
     },
+    exec: {
+        executor: 'Executor',
+        effort: 'Effort',
+        none: 'Not set',
+        noneEffort: 'Not set',
+        model: { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus' },
+        level: { low: 'Low', medium: 'Medium', high: 'High' },
+        chipTitle: 'Recommended executor and effort',
+    },
     brain: {
         label: 'Brainstorm',
         newIdea: 'New idea',
@@ -285,6 +294,7 @@ const en: typeof ru = {
             rating: 'rating',
             remark: 'note',
             handed: 'turn is with Claude',
+            exec: 'executor',
         },
         yes: 'yes',
         was: 'was "{0}"',

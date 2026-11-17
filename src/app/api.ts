@@ -5,7 +5,7 @@
 import type { JournalEntry } from '@/core/journal';
 import type { Doc } from '@1337exp/taoeditor/core';
 import type { MapData, MapPatch } from '@/core/map';
-import type { AxisDraft, AxisProject, AxisRecord, Brain, ProjectSummary } from '@/core/model';
+import type { AxisDraft, AxisProject, AxisRecord, Brain, Exec, ProjectSummary } from '@/core/model';
 
 export class ApiError extends Error {
     readonly status: number;
@@ -43,6 +43,8 @@ export type RecordPatch = Partial<Pick<AxisRecord, 'type' | 'title' | 'body' | '
     text?: string;
     /** The brainstorm fields: only the keys passed change; null clears the whole field. / Поля брейншторма: меняются только переданные ключи; null снимает поле. */
     brain?: Partial<Brain> | null;
+    /** The recommended executor of a task: only the keys passed change, a key null clears that part, null clears all. / Рекомендованный исполнитель задачи: меняются только переданные ключи, ключ null снимает свою часть, null снимает всё. */
+    exec?: Partial<Exec> | null;
     /** After this sibling; null is first. / После этого соседа; null значит первым. */
     after?: string | null;
     /** The `updated` stamp the change was made against; a record that has moved on answers 409. / Штамп `updated`, против которого правка; ушедшая вперёд запись отвечает 409. */
