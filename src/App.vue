@@ -322,6 +322,9 @@ watch(
 
 .nav-lang :deep(.tao-language-switch__face) {
     gap: calc((1 - var(--_compact, 0)) * var(--tao-space-2));
+    /* the name folds away on the rail: the face keeps the width of the icon-only face, a square like the buttons beside it / на рейке название сворачивается: грань держит ширину грани «только значок», квадрат, как соседние кнопки */
+    justify-content: center;
+    min-width: calc((var(--tao-control-height) - var(--tao-space-2) * 2) * var(--_compact, 0));
 }
 
 .nav-lang :deep(.tao-language-switch__name) {
