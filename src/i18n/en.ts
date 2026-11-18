@@ -5,7 +5,6 @@ const en: typeof ru = {
         loading: 'Loading…',
         offline: 'No connection to the Axis server. Run "npm run dev" or "npm start".',
         retry: 'Retry',
-        language: 'Language',
         toLight: 'Switch to the light theme',
         toDark: 'Switch to the dark theme',
     },

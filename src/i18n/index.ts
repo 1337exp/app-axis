@@ -10,9 +10,6 @@ export type LocaleCode = keyof typeof LOCALES;
 export type MessageKey = Paths<typeof ru>;
 export type { MessageArgs };
 
-/** Names of the languages in the languages themselves. / Названия языков на самих языках. */
-export const LOCALE_NAMES: Record<LocaleCode, string> = { ru: 'Русский', en: 'English' };
-
 const i18n = createI18n<typeof LOCALES, MessageKey>({ locales: LOCALES, fallback: 'en', storageKey: 'axis.locale' });
 
 export const { setLocale, translate, useI18n, current, codes } = i18n;

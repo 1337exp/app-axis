@@ -21,8 +21,7 @@ export function registerAppIcons(): void {
         board: { body: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>' },
         // a vertical axis with dated entries on it / вертикальная ось с датированными записями
         timeline: { body: '<path d="M6 3v18M11 6h9M11 12h9M11 18h6"/><circle cx="6" cy="6" r="1.8" fill="currentColor"/><circle cx="6" cy="12" r="1.8" fill="currentColor"/><circle cx="6" cy="18" r="1.8" fill="currentColor"/>' },
-        // the navigation: the language, the side panel folded and unfolded / навигация: язык, боковая панель свёрнута и развёрнута
-        language: { body: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>' },
+        // the navigation: the side panel folded and unfolded (the language is the built-in tao-globe) / навигация: боковая панель свёрнута и развёрнута (язык это встроенный tao-globe)
         'panel-close': { body: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M16 9l-3 3 3 3"/>' },
         'panel-open': { body: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M13 9l3 3-3 3"/>' },
         // a map: cards joined by lines / карта: карточки, соединённые линиями

@@ -3,7 +3,6 @@ export default {
         loading: 'Загрузка…',
         offline: 'Нет связи с сервером Axis. Запусти «npm run dev» или «npm start».',
         retry: 'Повторить',
-        language: 'Язык',
         toLight: 'Включить светлую тему',
         toDark: 'Включить тёмную тему',
     },
