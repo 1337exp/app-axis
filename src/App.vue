@@ -11,13 +11,13 @@
  * панель с подписями на широком окне, рейка иконок, когда она свёрнута или окно уже, и панель снизу на телефоне (там
  * тонкая шапка несёт проект, язык и тему, для которых в панели места нет).
  */
-import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLoader, TaoNav, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
+import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLanguageSwitch, TaoLoader, TaoNav, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoNavItem } from '@1337exp/taoui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ui } from '@/app/ui';
 import { openProject, setView, start, state, progress, waiting } from '@/app/state';
 import type { View } from '@/app/state';
-import { LOCALE_NAMES, codes, current, setLocale, useI18n } from '@/i18n';
+import { codes, current, setLocale, useI18n } from '@/i18n';
 import type { LocaleCode } from '@/i18n';
 import BoardPane from '@/ui/BoardPane.vue';
 import BrainPane from '@/ui/BrainPane.vue';
@@ -100,15 +100,15 @@ function onProject(id: string): void {
     else if (id !== state.projectId) void openProject(id);
 }
 
-const localeItems = computed<TaoMenuItem[]>(() => codes.map((code) => ({ type: 'radio', id: code, group: 'locale', label: LOCALE_NAMES[code], checked: code === current.value })));
-const onLocale = (id: string): void => setLocale(id as LocaleCode);
+// the switch writes <html lang> itself; the texts and the storage are ours (createI18n)
+// переключатель сам пишет <html lang>; тексты и хранилище наши (createI18n)
+const onLocale = (code: string): void => setLocale(code as LocaleCode);
 
 watch(
     () => state.project?.title,
     (title) => (document.title = title ? `${title} · Axis` : 'Axis'),
     { immediate: true },
 );
-watch(current, (code) => (document.documentElement.lang = code), { immediate: true });
 </script>
 
 <template>
@@ -129,14 +129,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
 
         <template #footer>
             <div class="nav-foot">
-                <TaoDropdownMenu :items="localeItems" :menu-label="t('app.language')" placement="top-start" @select="onLocale">
-                    <template #button>
-                        <span class="nav-chip nav-chip--tool" :title="t('app.language')">
-                            <TaoIcon name="language" />
-                            <span class="nav-chip__text">{{ LOCALE_NAMES[current] }}</span>
-                        </span>
-                    </template>
-                </TaoDropdownMenu>
+                <TaoLanguageSwitch class="nav-lang" :model-value="current" :languages="codes" placement="top-start" @update:model-value="onLocale" />
                 <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
                 <TaoButton
                     v-if="!narrow"
@@ -164,11 +157,7 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
                     </template>
                 </TaoDropdownMenu>
                 <span class="app__space"></span>
-                <TaoDropdownMenu :items="localeItems" :menu-label="t('app.language')" @select="onLocale">
-                    <template #button>
-                        <span class="nav-chip nav-chip--tool" :title="t('app.language')"><TaoIcon name="language" /></span>
-                    </template>
-                </TaoDropdownMenu>
+                <TaoLanguageSwitch class="nav-lang" :model-value="current" :languages="codes" icon-only @update:model-value="onLocale" />
                 <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
             </header>
 
@@ -278,12 +267,6 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
     font-size: var(--tao-control-font-size);
 }
 
-.nav-chip--tool {
-    border-color: transparent;
-    background: none;
-    color: var(--tao-color-text-muted);
-}
-
 .nav-chip__text {
     flex: 1;
     min-width: 0;
@@ -332,9 +315,18 @@ watch(current, (code) => (document.documentElement.lang = code), { immediate: tr
     min-width: calc(var(--_compact, 0) * 100%);
 }
 
-.nav-foot :deep(.tao-dropdown-menu__button) {
-    padding: 0;
-    background: none;
+/* the language switch is a quiet tool; on the rail only its globe is shown (the name folds with --_compact, as the text of a chip) / переключатель языка тихий инструмент; на рейке виден только глобус (название сворачивается через --_compact, как текст фишки) */
+.nav-lang :deep(.tao-dropdown-menu__button) {
+    color: var(--tao-color-text-muted);
+}
+
+.nav-lang :deep(.tao-language-switch__face) {
+    gap: calc((1 - var(--_compact, 0)) * var(--tao-space-2));
+}
+
+.nav-lang :deep(.tao-language-switch__name) {
+    max-width: calc((1 - var(--_compact, 0)) * 600px);
+    overflow: hidden;
 }
 
 .app__bar {
