@@ -142,6 +142,7 @@ export default {
         label: 'Записи проекта',
         empty: 'Здесь пока пусто',
         emptyText: 'Напиши первую запись в поле ниже. Раздел собирает записи в ветку.',
+        open: 'Открыть',
         addChild: 'Добавить внутрь',
         moveUp: 'Выше',
         moveDown: 'Ниже',
@@ -152,6 +153,7 @@ export default {
         byClaude: 'Последним правил Claude',
         hasText: 'Есть текст',
         hasDraft: 'Есть несохранённый черновик текста',
+        moveFailed: 'Не удалось перенести',
     },
     quick: {
         placeholder: 'Что добавить?',

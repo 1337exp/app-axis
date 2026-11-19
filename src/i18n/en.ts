@@ -144,6 +144,7 @@ const en: typeof ru = {
         label: 'Records of the project',
         empty: 'Nothing here yet',
         emptyText: 'Write the first record in the field below. An area gathers records into a branch.',
+        open: 'Open',
         addChild: 'Add inside',
         moveUp: 'Move up',
         moveDown: 'Move down',
@@ -154,6 +155,7 @@ const en: typeof ru = {
         byClaude: 'Last edited by Claude',
         hasText: 'Has a text',
         hasDraft: 'Has an unsaved draft of the text',
+        moveFailed: 'Could not move',
     },
     quick: {
         placeholder: 'What to add?',

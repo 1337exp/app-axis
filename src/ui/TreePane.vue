@@ -7,12 +7,12 @@
  * и кто трогал её последним; поле внизу превращает строку в запись, не отрывая рук от клавиатуры.
  */
 import { TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoInput, TaoKbd, TaoTree, confirm, toast } from '@1337exp/taoui';
-import type { TaoMenuItem, TaoTreeNode } from '@1337exp/taoui';
+import type { TaoMenuItem, TaoTreeMove, TaoTreeNode } from '@1337exp/taoui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { isFound, kept, query } from '@/app/search';
 import { ui } from '@/app/ui';
 import { readIds, writeIds } from '@/app/viewFilter';
-import { addRecord, countInside, hasDraft, moveStep, outdent, recordById, removeRecord, select, state, tree } from '@/app/state';
+import { addRecord, countInside, hasDraft, moveStep, outdent, patchRecord, recordById, removeRecord, select, state, tree } from '@/app/state';
 import type { AxisRecord, RecordType } from '@/core/model';
 import { parseQuick } from '@/core/quick';
 import { markRanges } from '@/core/search';
@@ -127,13 +127,34 @@ function onMenuAsked(): void {
     queueMicrotask(() => (menuAsked = false));
 }
 
+/**
+ * A single click only picks a row (the highlight, where the quick input puts a new record); the record opens on a double click
+ * or Enter, as a file opens in a file manager, so a stray click does not swap the open record. What is open is `state.selected`;
+ * when it changes from elsewhere (a new record, the hash, another view) the pick follows it.
+ * Одинарный клик только выбирает строку (подсветка, куда быстрый ввод ставит новую запись); запись открывается двойным кликом
+ * или Enter, как файл в файловом менеджере, и случайный клик не подменяет открытую запись. Открытая это `state.selected`;
+ * когда она меняется не отсюда (новая запись, адрес, другой вид), выбор идёт за ней.
+ */
+const picked = ref<string | null>(state.selected);
+watch(
+    () => state.selected,
+    (id) => (picked.value = id),
+);
+
 const selected = computed({
-    get: () => state.selected,
+    get: () => (picked.value && recordById(picked.value) ? picked.value : null),
     set: (id: string | string[] | null) => {
         if (menuAsked) return;
-        select(typeof id === 'string' ? id : null);
+        picked.value = typeof id === 'string' ? id : null;
     },
 });
+
+/** Opens the record of a row in the pane. / Открывает запись строки в панели. */
+const openRecord = (id: string): void => select(id);
+/** A double click on a branch only folds or unfolds it in the tree; the record opens too (the row was picked by the first click). / Двойной клик по ветке дерево лишь сворачивает или разворачивает; запись открывается тоже (строку выбрал первый клик). */
+const openPicked = (): void => {
+    if (picked.value) openRecord(picked.value);
+};
 
 function row(id: string): { record: AxisRecord; done: number; total: number; share: number; active: number } | null {
     const node = nodeById.value.get(id);
@@ -155,6 +176,7 @@ async function run(work: () => Promise<unknown>): Promise<void> {
 function menuOf(record: AxisRecord | undefined): TaoMenuItem[] {
     if (!record) return [];
     return [
+        { id: 'open', label: t('tree.open'), icon: 'mark-text' },
         { id: 'add', label: t('tree.addChild'), icon: 'tao-plus' },
         { type: 'separator' },
         { id: 'up', label: t('tree.moveUp'), icon: 'tao-arrow-up' },
@@ -166,7 +188,8 @@ function menuOf(record: AxisRecord | undefined): TaoMenuItem[] {
 }
 
 async function act(action: string, record: AxisRecord): Promise<void> {
-    if (action === 'add') {
+    if (action === 'open') openRecord(record.id);
+    else if (action === 'add') {
         target.value = record.id;
         open(record.id);
         await nextTick();
@@ -184,6 +207,26 @@ async function act(action: string, record: AxisRecord): Promise<void> {
     }
 }
 
+/**
+ * A drag (or Ctrl+X / Ctrl+V) of the tree: the rows go under `parentId` at `index` among the children left once the moved
+ * ones are taken out. The server wants "after this sibling" (null: first), so the sibling before `index` is found in the
+ * order the tree shows. A failure rejects, and the tree puts the rows back and says `move-error`. Copies are refused by `can-drop`;
+ * while a search is typed nothing moves (`movable`), the filtered list has other indexes.
+ * Перенос в дереве (мышью или Ctrl+X / Ctrl+V): строки встают под `parentId` на место `index` среди оставшихся детей.
+ * Серверу нужно «после этого соседа» (null: первым), поэтому сосед перед `index` берётся в порядке, который показывает дерево.
+ * Ошибка отклоняет обещание, дерево возвращает строки и говорит `move-error`. Копии отклоняет `can-drop`; пока набран поиск,
+ * ничего не переносится (`movable`): у отфильтрованного списка другие индексы.
+ */
+async function onMove(move: TaoTreeMove): Promise<void> {
+    const siblings = (move.parentId ? (nodeById.value.get(move.parentId)?.children ?? []) : tree.value).map((n) => n.record.id).filter((id) => !move.ids.includes(id));
+    let after: string | null = siblings[move.index - 1] ?? null;
+    for (const id of move.ids) {
+        await patchRecord(id, { parent: move.parentId, after });
+        after = id;
+    }
+    if (move.parentId) open(move.parentId);
+}
+
 // ───────────────────────────── quick input / быстрый ввод ─────────────────────────────
 
 const line = ref('');
@@ -198,10 +241,7 @@ watch(
 
 /** "Add inside" pins the parent until the selection moves elsewhere. / «Добавить внутрь» закрепляет родителя, пока выбор не уйдёт. */
 const target = ref<string | null>(null);
-watch(
-    () => state.selected,
-    () => (target.value = null),
-);
+watch(picked, () => (target.value = null));
 
 /**
  * Where a new record goes: into the pinned record, into the selected area, beside the selected record, or to the top.
@@ -210,7 +250,7 @@ watch(
 const place = computed<{ parent: string | null; after?: string }>(() => {
     const pinned = target.value ? recordById(target.value) : undefined;
     if (pinned) return { parent: pinned.id };
-    const at = state.selected ? recordById(state.selected) : undefined;
+    const at = picked.value ? recordById(picked.value) : undefined;
     if (!at) return { parent: null };
     return at.type === 'area' ? { parent: at.id } : { parent: at.parent, after: at.id };
 });
@@ -251,6 +291,12 @@ async function add(): Promise<void> {
                 :aria-label="t('tree.label')"
                 :menu="(node: TaoTreeNode) => menuOf(recordById(node.id))"
                 :menu-label="t('tree.actions')"
+                :movable="!kept"
+                :can-drop="(move: TaoTreeMove) => !move.copy"
+                @open="(node: TaoTreeNode) => openRecord(node.id)"
+                @dblclick="openPicked"
+                @move="onMove"
+                @move-error="(_: TaoTreeMove, error: unknown) => toast().danger().message(`${t('tree.moveFailed')}: ${error instanceof Error ? error.message : String(error)}`)"
                 @menu="onMenuAsked"
                 @menu-select="(id: string, node: TaoTreeNode) => act(id, recordById(node.id)!)"
             >
