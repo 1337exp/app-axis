@@ -10,7 +10,7 @@
  * `TaoDate` из TaoUI это целое поле (рамка с датой) и компактного вида у него нет, поэтому кнопка это `TaoPopover`
  * с `TaoCalendar`, из которых сам `TaoDate` и собран.
  */
-import { TaoButton, TaoCalendar, TaoPopover } from '@1337exp/taoui';
+import { TaoButton, TaoCalendar, TaoPopover, TaoTooltip } from '@1337exp/taoui';
 import { nextTick, ref, watch } from 'vue';
 import type { AxisRecord } from '@/core/model';
 import { useI18n } from '@/i18n';
@@ -39,7 +39,7 @@ async function choose(value: unknown): Promise<void> {
 <template>
     <TaoPopover v-model="open" class="due-button" :class="{ 'due-button--open': open }" placement="bottom-end">
         <template #trigger>
-            <TaoButton variant="ghost" tone="neutral" size="small" icon="tao-calendar" :aria-label="t('timeline.setDate')" :title="t('timeline.setDate')" :aria-expanded="open" aria-haspopup="dialog" />
+            <TaoTooltip :content="t('timeline.setDate')"><TaoButton variant="ghost" tone="neutral" size="small" icon="tao-calendar" :aria-label="t('timeline.setDate')" :aria-expanded="open" aria-haspopup="dialog" /></TaoTooltip>
         </template>
         <TaoCalendar ref="calendar" :model-value="record.due" :today-text="t('record.today')" :clear-text="t('record.dueClear')" @change="choose" />
     </TaoPopover>

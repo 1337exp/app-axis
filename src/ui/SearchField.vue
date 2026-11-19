@@ -9,7 +9,7 @@
  * Escape очищает, повторный выходит из поля; Enter просит карту показать найденные карточки. В узком окне это иконка,
  * которая раскрывает поле. Рядом с ним, пока набрана строка, маленькое «найдено N».
  */
-import { TaoButton, TaoIcon, TaoInput } from '@1337exp/taoui';
+import { TaoButton, TaoIcon, TaoInput, TaoTooltip } from '@1337exp/taoui';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 defineProps<{ fold?: boolean; wide?: boolean }>();
@@ -64,7 +64,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey));
 
 <template>
     <div ref="root" class="search" :class="{ 'search--open': open || searching, 'search--fold': fold, 'search--wide': wide }" role="search">
-        <TaoButton class="search__icon" variant="ghost" tone="neutral" icon="tao-search" :aria-label="t('search.open')" :title="t('search.open')" @click="focus" />
+        <TaoTooltip :content="t('search.open')"><TaoButton class="search__icon" variant="ghost" tone="neutral" icon="tao-search" :aria-label="t('search.open')" @click="focus" /></TaoTooltip>
         <TaoInput
             v-model="search.line"
             class="search__input"
@@ -76,9 +76,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey));
         >
             <template #prefix><TaoIcon name="tao-search" /></template>
             <template #suffix>
-                <button v-if="search.line !== ''" type="button" class="search__clear" :aria-label="t('search.clear')" :title="t('search.clear')" @click="clearSearch(); input()?.focus()">
-                    <TaoIcon name="tao-close" />
-                </button>
+                <TaoTooltip v-if="search.line !== ''" :content="t('search.clear')">
+                    <button type="button" class="search__clear" :aria-label="t('search.clear')" @click="clearSearch(); input()?.focus()">
+                        <TaoIcon name="tao-close" />
+                    </button>
+                </TaoTooltip>
             </template>
         </TaoInput>
         <span v-if="found" class="search__count" aria-live="polite">{{ tn('search.found', found.size) }}</span>

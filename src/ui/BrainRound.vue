@@ -8,7 +8,7 @@
  * (его можно принять как решение) и поле для ответа. Старый раунд свёрнут в одну строку (задумка и начало вердикта);
  * последний открыт. Состояние это `roundState`, ничего здесь не хранится.
  */
-import { TaoButton, TaoIcon, toast } from '@1337exp/taoui';
+import { TaoButton, TaoIcon, TaoTooltip, toast } from '@1337exp/taoui';
 import { computed, ref } from 'vue';
 import { addSeed, patchBrain, patchRecord, select } from '@/app/state';
 import { isAccepted, roundState } from '@/core/brainstorm';
@@ -73,22 +73,13 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
             <section class="seed">
                 <header class="seed__head">
                     <TaoIcon class="seed__icon" name="type-idea" />
-                    <button type="button" class="seed__title" :title="t('brain.openRecord')" @click="select(round.seed.id)">{{ round.seed.title }}</button>
+                    <TaoTooltip class="title-tip" :content="t('brain.openRecord')"><button type="button" class="seed__title" @click="select(round.seed.id)">{{ round.seed.title }}</button></TaoTooltip>
                     <span class="chip" :class="`chip--${state}`">{{ t(`brain.state.${state}`) }}</span>
                     <TaoButton v-if="state === 'draft' || state === 'rating'" size="small" icon="brainstorm" @click="hand(true)">{{ t('brain.hand') }}</TaoButton>
                     <TaoButton v-else-if="state === 'waiting'" size="small" variant="secondary" tone="neutral" @click="hand(false)">{{ t('brain.take') }}</TaoButton>
-                    <TaoButton
-                        v-if="!last"
-                        size="small"
-                        variant="ghost"
-                        tone="neutral"
-                        icon="tao-chevron-down"
-                        class="seed__fold"
-                        :aria-label="t('brain.collapse')"
-                        :title="t('brain.collapse')"
-                        :aria-expanded="true"
-                        @click="touched = false"
-                    />
+                    <TaoTooltip v-if="!last" class="seed__fold" :content="t('brain.collapse')">
+                        <TaoButton size="small" variant="ghost" tone="neutral" icon="tao-chevron-down" :aria-label="t('brain.collapse')" :aria-expanded="true" @click="touched = false" />
+                    </TaoTooltip>
                 </header>
                 <BrainText :body="round.seed.body" :title="round.seed.title" />
             </section>
@@ -106,7 +97,7 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
                 <header class="verdict__head">
                     <TaoIcon :name="accepted ? 'type-decision' : 'type-note'" />
                     <h3 class="label label--inline">{{ accepted ? t('brain.accepted') : t('brain.verdict') }}</h3>
-                    <button type="button" class="verdict__title" :title="t('brain.openRecord')" @click="select(round.verdict.id)">{{ round.verdict.title }}</button>
+                    <TaoTooltip class="title-tip" :content="t('brain.openRecord')"><button type="button" class="verdict__title" @click="select(round.verdict.id)">{{ round.verdict.title }}</button></TaoTooltip>
                     <TaoButton v-if="!accepted" size="small" variant="secondary" tone="neutral" icon="type-decision" @click="accept">{{ t('brain.accept') }}</TaoButton>
                 </header>
                 <BrainText :body="round.verdict.body" />
@@ -213,10 +204,14 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
     color: var(--tao-color-text-muted);
 }
 
-.seed__title,
-.verdict__title {
+/* the tooltip wrapper is the flex item that takes the free width; the button is the text inside it / обёртка подсказки это flex-элемент, занимающий свободную ширину; кнопка это текст внутри неё */
+.title-tip {
     flex: 1;
     min-width: 8em;
+}
+
+.seed__title,
+.verdict__title {
     padding: 0;
     border: 0;
     background: none;

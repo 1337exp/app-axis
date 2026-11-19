@@ -14,7 +14,7 @@
  * места ставит автоматическая раскладка (`core/map.ts`). Клик выбирает карточку, двойной клик или Enter открывает её в панели
  * справа, в той же, что у доски.
  */
-import { TaoButton, TaoEmpty, TaoInput, TaoMenu, confirm, toast } from '@1337exp/taoui';
+import { TaoButton, TaoEmpty, TaoInput, TaoMenu, TaoTooltip, confirm, toast } from '@1337exp/taoui';
 import type { TaoMenuItem } from '@1337exp/taoui';
 import { fitCamera, screenToWorld, worldToScreen, zoomAt } from '@1337exp/taoux/camera';
 import type { Camera } from '@1337exp/taoux/camera';
@@ -736,9 +736,9 @@ onBeforeUnmount(() => {
 <template>
     <section class="map-pane" :aria-label="t('map.label')">
         <FilterBar v-model:root="root" :type-on="typeOn" :area-options="areaOptions" compact @type="setType">
-            <TaoButton v-model:pressed="showDone" variant="ghost" tone="neutral" icon="tao-check-circle" :aria-label="t('map.showDone')" :title="t('map.showDone')" />
-            <TaoButton v-model:pressed="treeLines" variant="ghost" tone="neutral" icon="tree" :aria-label="t('map.treeLines')" :title="t('map.treeLines')" />
-            <TaoButton variant="ghost" tone="neutral" icon="tidy" :aria-label="t('map.tidy')" :title="t('map.tidy')" @click="tidy" />
+            <TaoTooltip :content="t('map.showDone')"><TaoButton v-model:pressed="showDone" variant="ghost" tone="neutral" icon="tao-check-circle" :aria-label="t('map.showDone')" /></TaoTooltip>
+            <TaoTooltip :content="t('map.treeLines')"><TaoButton v-model:pressed="treeLines" variant="ghost" tone="neutral" icon="tree" :aria-label="t('map.treeLines')" /></TaoTooltip>
+            <TaoTooltip :content="t('map.tidy')"><TaoButton variant="ghost" tone="neutral" icon="tidy" :aria-label="t('map.tidy')" @click="tidy" /></TaoTooltip>
         </FilterBar>
 
         <div class="map-pane__stage" @keydown="onKeydown" @pointerdown.capture="trackAlt" @dblclick="onDouble">
@@ -762,17 +762,17 @@ onBeforeUnmount(() => {
 
                 <!-- the button of the selected link sits in the world on its middle, drawn at the size of the screen / кнопка выбранной связи стоит в мире на её середине, размером с экран -->
                 <div v-if="selectedLine" class="map-pane__remove map__ui" :style="{ transform: `translate(${selectedLine.mid.x}px, ${selectedLine.mid.y}px) scale(${1 / zoom}) translate(-50%, -50%)` }" @pointerdown.stop>
-                    <TaoButton size="small" variant="secondary" tone="danger" icon="tao-trash" :aria-label="t('map.removeLink')" :title="t('map.removeLink')" @click="removeLink(selectedLine.id)" />
+                    <TaoTooltip :content="t('map.removeLink')"><TaoButton size="small" variant="secondary" tone="danger" icon="tao-trash" :aria-label="t('map.removeLink')" @click="removeLink(selectedLine.id)" /></TaoTooltip>
                 </div>
 
                 <template #overlay>
                     <TaoEmpty v-if="shown.length === 0" class="map-pane__empty" :title="t('map.empty')">{{ t('map.emptyText') }}</TaoEmpty>
 
                     <div class="map-pane__zoom map__ui" @pointerdown.stop @dblclick.stop>
-                        <TaoButton variant="ghost" tone="neutral" size="small" icon="tao-minus" :aria-label="t('map.zoomOut')" :title="t('map.zoomOut')" @click="zoomTo(1 / 1.25)" />
-                        <TaoButton variant="ghost" tone="neutral" size="small" :aria-label="t('map.zoom100')" :title="t('map.zoom100')" @click="zoomTo('one')">{{ Math.round(zoom * 100) }}%</TaoButton>
-                        <TaoButton variant="ghost" tone="neutral" size="small" icon="tao-plus" :aria-label="t('map.zoomIn')" :title="t('map.zoomIn')" @click="zoomTo(1.25)" />
-                        <TaoButton variant="ghost" tone="neutral" size="small" icon="fit" :aria-label="t('map.fit')" :title="t('map.fit')" @click="fit()" />
+                        <TaoTooltip :content="t('map.zoomOut')"><TaoButton variant="ghost" tone="neutral" size="small" icon="tao-minus" :aria-label="t('map.zoomOut')" @click="zoomTo(1 / 1.25)" /></TaoTooltip>
+                        <TaoTooltip :content="t('map.zoom100')"><TaoButton variant="ghost" tone="neutral" size="small" :aria-label="t('map.zoom100')" @click="zoomTo('one')">{{ Math.round(zoom * 100) }}%</TaoButton></TaoTooltip>
+                        <TaoTooltip :content="t('map.zoomIn')"><TaoButton variant="ghost" tone="neutral" size="small" icon="tao-plus" :aria-label="t('map.zoomIn')" @click="zoomTo(1.25)" /></TaoTooltip>
+                        <TaoTooltip :content="t('map.fit')"><TaoButton variant="ghost" tone="neutral" size="small" icon="fit" :aria-label="t('map.fit')" @click="fit()" /></TaoTooltip>
                     </div>
 
                     <form v-if="creating" ref="field" class="map-pane__new map__ui" :style="{ left: `${creating.x}px`, top: `${creating.y}px` }" @submit.prevent="submitNew" @keydown.esc.stop.prevent="creating = null" @pointerdown.stop @dblclick.stop>

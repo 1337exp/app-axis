@@ -6,7 +6,7 @@
  * Поле, где пишется задумка: многострочное поле и кнопка. Ctrl+Enter отправляет. Первая строка становится заголовком,
  * остальное текстом (`ideaFromText`). После удачной отправки очищается, при неудаче текст остаётся.
  */
-import { TaoButton, TaoTextarea, toast } from '@1337exp/taoui';
+import { TaoButton, TaoTextarea, TaoTooltip, toast } from '@1337exp/taoui';
 import { computed, ref } from 'vue';
 import { ideaFromText } from '@/core/brainstorm';
 import { useI18n } from '@/i18n';
@@ -50,7 +50,7 @@ function onKeydown(event: KeyboardEvent): void {
 <template>
     <form class="compose" @submit.prevent="go">
         <TaoTextarea v-model="text" :placeholder="placeholder" :aria-label="label" :rows="rows ?? 2" max-height="40vh" variant="outline" :disabled="busy" @keydown="onKeydown" />
-        <TaoButton type="submit" :icon="icon" :disabled="!ready" :loading="busy" :title="`${submit} (${t('brain.sendHint')})`">{{ submit }}</TaoButton>
+        <TaoTooltip :content="`${submit} (${t('brain.sendHint')})`"><TaoButton type="submit" :icon="icon" :disabled="!ready" :loading="busy">{{ submit }}</TaoButton></TaoTooltip>
     </form>
 </template>
 

@@ -11,7 +11,7 @@
  * панель с подписями на широком окне, рейка иконок, когда она свёрнута или окно уже, и панель снизу на телефоне (там
  * тонкая шапка несёт проект, язык и тему, для которых в панели места нет).
  */
-import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLanguageSwitch, TaoLoader, TaoNav, TaoSplit, TaoThemeToggle } from '@1337exp/taoui';
+import { TaoAlert, TaoButton, TaoDropdownMenu, TaoEmpty, TaoIcon, TaoLanguageSwitch, TaoLoader, TaoNav, TaoSplit, TaoThemeToggle, TaoTooltip } from '@1337exp/taoui';
 import type { TaoMenuItem, TaoNavItem } from '@1337exp/taoui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ui } from '@/app/ui';
@@ -131,16 +131,9 @@ watch(
             <div class="nav-foot">
                 <TaoLanguageSwitch class="nav-lang" :model-value="current" :languages="codes" placement="top-start" @update:model-value="onLocale" />
                 <TaoThemeToggle :to-light-label="t('app.toLight')" :to-dark-label="t('app.toDark')" />
-                <TaoButton
-                    v-if="!narrow"
-                    class="nav-fold"
-                    variant="ghost"
-                    tone="neutral"
-                    :icon="folded ? 'panel-open' : 'panel-close'"
-                    :aria-label="folded ? t('nav.expand') : t('nav.collapse')"
-                    :title="folded ? t('nav.expand') : t('nav.collapse')"
-                    @click="folded = !folded"
-                />
+                <TaoTooltip v-if="!narrow" class="nav-fold" :content="folded ? t('nav.expand') : t('nav.collapse')" placement="right">
+                    <TaoButton variant="ghost" tone="neutral" :icon="folded ? 'panel-open' : 'panel-close'" :aria-label="folded ? t('nav.expand') : t('nav.collapse')" @click="folded = !folded" />
+                </TaoTooltip>
             </div>
         </template>
 

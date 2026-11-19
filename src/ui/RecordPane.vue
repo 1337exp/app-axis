@@ -18,7 +18,7 @@ import { isEmptyDoc } from '@1337exp/taoeditor/core';
 import type { Doc } from '@1337exp/taoeditor/core';
 import { TaoEditorView } from '@1337exp/taoeditor/vue';
 import { TaoEditor } from '@1337exp/taoeditor/vue/taoui';
-import { TaoAlert, TaoButton, TaoCombobox, TaoDate, TaoEmpty, TaoIcon, TaoInput, TaoModal, TaoSegmented, TaoSegmentedOption, TaoSelect, TaoTextarea, confirm, toast } from '@1337exp/taoui';
+import { TaoAlert, TaoButton, TaoCombobox, TaoDate, TaoEmpty, TaoIcon, TaoInput, TaoModal, TaoSegmented, TaoSegmentedOption, TaoSelect, TaoTextarea, TaoTooltip, confirm, toast } from '@1337exp/taoui';
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { ApiError, api } from '@/app/api';
 import type { RecordPatch } from '@/app/api';
@@ -492,7 +492,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
         <!-- the sections above the record: a row of its own, only when there are some (no height reserved otherwise) / разделы над записью: своя строка, только когда они есть (иначе высоты не занимает) -->
         <!-- the path starts with the root «#»: a click on it closes the open record (in the drawer, the drawer) / путь начинается с корня «#»: клик по нему закрывает открытую запись (в ящике, ящик) -->
         <nav class="record__path" :aria-label="t('record.path')">
-            <button type="button" class="record__step record__root" :aria-label="t('record.close')" :title="t('record.close')" @click="select(null)">#</button>
+            <TaoTooltip :content="t('record.close')"><button type="button" class="record__step record__root" :aria-label="t('record.close')" @click="select(null)">#</button></TaoTooltip>
             <span aria-hidden="true">/</span>
             <template v-for="step in path" :key="step.id">
                 <button type="button" class="record__step" @click="select(step.id)">{{ step.title }}</button>
@@ -514,7 +514,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                 :aria-label="t('record.title')"
                 @blur="saveTitle"
             />
-            <TaoButton class="record__remove" variant="ghost" tone="neutral" icon="tao-trash" :aria-label="t('record.remove')" :title="t('record.remove')" @click="remove" />
+            <TaoTooltip :content="t('record.remove')"><TaoButton class="record__remove" variant="ghost" tone="neutral" icon="tao-trash" :aria-label="t('record.remove')" @click="remove" /></TaoTooltip>
         </div>
 
         <div class="record__props">
@@ -598,7 +598,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                     <a :href="api.assetUrl(state.projectId, name)" target="_blank" rel="noopener" :aria-label="t('images.open')">
                         <img :src="api.assetUrl(state.projectId, name)" alt="" loading="lazy" />
                     </a>
-                    <TaoButton class="shot__remove" size="small" variant="secondary" tone="neutral" icon="tao-close" :aria-label="t('images.remove')" :title="t('images.remove')" @click="removeImage(name)" />
+                    <TaoTooltip :content="t('images.remove')"><TaoButton class="shot__remove" size="small" variant="secondary" tone="neutral" icon="tao-close" :aria-label="t('images.remove')" @click="removeImage(name)" /></TaoTooltip>
                 </li>
             </ul>
             <div class="block__row">
@@ -617,7 +617,7 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
                         <span class="mark" :class="toneClass(recordById(link.to)!)"><TaoIcon :name="recordIcon(recordById(link.to)!)" /></span>
                         {{ recordById(link.to)!.title }}
                     </button>
-                    <TaoButton size="small" variant="ghost" tone="neutral" icon="tao-close" :aria-label="t('links.remove')" :title="t('links.remove')" @click="removeLink(link.to, link.kind)" />
+                    <TaoTooltip :content="t('links.remove')"><TaoButton size="small" variant="ghost" tone="neutral" icon="tao-close" :aria-label="t('links.remove')" @click="removeLink(link.to, link.kind)" /></TaoTooltip>
                 </li>
                 <li v-for="link in incoming" :key="`in:${link.kind}:${link.from.id}`" class="linkrow linkrow--in">
                     <span class="linkrow__kind">{{ t(`links.in.${link.kind}`) }}</span>

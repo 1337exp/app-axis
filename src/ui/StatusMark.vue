@@ -8,7 +8,7 @@
  * (не начата, в работе, готова, не начата…); у других типов такого быстрого хода нет, и отметка простая.
  * Дерево и лента рисуют её одинаково, поэтому она живёт тут один раз.
  */
-import { TaoIcon } from '@1337exp/taoui';
+import { TaoIcon, TaoTooltip } from '@1337exp/taoui';
 import type { AxisRecord } from '@/core/model';
 import { useI18n } from '@/i18n';
 import { nextStatus, recordIcon, toneClass } from './marks';
@@ -28,18 +28,18 @@ async function toggle(): Promise<void> {
 </script>
 
 <template>
-    <button
-        v-if="record.type === 'task'"
-        type="button"
-        class="mark mark--button"
-        :class="toneClass(record)"
-        :title="`${t('tree.toggle')}: ${t(`status.task.${record.status}`)}`"
-        :aria-label="`${t('tree.toggle')}: ${t(`status.task.${record.status}`)}`"
-        :tabindex="tabbable === false ? -1 : undefined"
-        @click.stop="toggle"
-    >
-        <TaoIcon :name="recordIcon(record)" />
-    </button>
+    <TaoTooltip v-if="record.type === 'task'" :content="`${t('tree.toggle')}: ${t(`status.task.${record.status}`)}`">
+        <button
+            type="button"
+            class="mark mark--button"
+            :class="toneClass(record)"
+            :aria-label="`${t('tree.toggle')}: ${t(`status.task.${record.status}`)}`"
+            :tabindex="tabbable === false ? -1 : undefined"
+            @click.stop="toggle"
+        >
+            <TaoIcon :name="recordIcon(record)" />
+        </button>
+    </TaoTooltip>
     <span v-else class="mark" :class="toneClass(record)" :title="t(`type.${record.type}`)"><TaoIcon :name="recordIcon(record)" /></span>
 </template>
 
