@@ -115,9 +115,24 @@ const open = (id: string): void => {
     if (!expanded.value.includes(id)) expanded.value = [...expanded.value, id];
 };
 
+/**
+ * In Axis the selected row is the open record, so a right click must not select: the tree selects the row it opens its menu on
+ * (as file managers do), and `menu` comes in the same tick right before that `update:selected`. The menu acts on its own row.
+ * В Axis выбранная строка это открытая запись, поэтому правый клик не должен выбирать: дерево выбирает строку, на которой
+ * открывает меню (как файловые менеджеры), а `menu` приходит в том же такте прямо перед этим `update:selected`. Меню действует на свою строку.
+ */
+let menuAsked = false;
+function onMenuAsked(): void {
+    menuAsked = true;
+    queueMicrotask(() => (menuAsked = false));
+}
+
 const selected = computed({
     get: () => state.selected,
-    set: (id: string | string[] | null) => select(typeof id === 'string' ? id : null),
+    set: (id: string | string[] | null) => {
+        if (menuAsked) return;
+        select(typeof id === 'string' ? id : null);
+    },
 });
 
 function row(id: string): { record: AxisRecord; done: number; total: number; share: number; active: number } | null {
@@ -236,6 +251,7 @@ async function add(): Promise<void> {
                 :aria-label="t('tree.label')"
                 :menu="(node: TaoTreeNode) => menuOf(recordById(node.id))"
                 :menu-label="t('tree.actions')"
+                @menu="onMenuAsked"
                 @menu-select="(id: string, node: TaoTreeNode) => act(id, recordById(node.id)!)"
             >
                 <template #icon="{ node }">
