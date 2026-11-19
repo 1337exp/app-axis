@@ -8,7 +8,7 @@
 import { ratingOf } from '../src/core/brainstorm.ts';
 import type { JournalEntry } from '../src/core/journal.ts';
 import { execText, hasStatus } from '../src/core/model.ts';
-import type { AxisProject, AxisRecord } from '../src/core/model.ts';
+import type { AxisDraft, AxisProject, AxisRecord } from '../src/core/model.ts';
 import { fold, matchesWords } from '../src/core/search.ts';
 import { docToText, preview } from '../src/core/text.ts';
 import { buildTree, pathOf, progressOf, progressOfAll } from '../src/core/tree.ts';
@@ -44,7 +44,7 @@ function incomingOf(records: readonly AxisRecord[]): Map<string, { from: string;
     return map;
 }
 
-function line(node: TreeNode, incoming: ReadonlyMap<string, { from: string; kind: string }[]>): string {
+function line(node: TreeNode, incoming: ReadonlyMap<string, { from: string; kind: string }[]>, drafts: ReadonlySet<string>): string {
     const r = node.record;
     const kind = hasStatus(r.type) ? `${r.type}·${r.status}` : r.type;
     const parts = [`[${r.id}] ${kind}  ${r.title}`];
@@ -54,6 +54,8 @@ function line(node: TreeNode, incoming: ReadonlyMap<string, { from: string; kind
     }
     if (r.due) parts.push(`due ${r.due}`);
     if (r.body) parts.push('¶');
+    // an unsaved text the person is typing: changing the text now will collide with it / несохранённый текст, который человек сейчас набирает: смена текста столкнётся с ним
+    if (drafts.has(r.id)) parts.push('✎ draft');
     if (r.images.length > 0) parts.push(`🖼${r.images.length}`);
     for (const link of r.links) parts.push(`→ ${link.kind}:${link.to}`);
     // who points at this record (`← because:ab12cd34`: that record is here because of this one) / кто ссылается на эту запись
@@ -67,15 +69,18 @@ function line(node: TreeNode, incoming: ReadonlyMap<string, { from: string; kind
 
 /**
  * The whole project as an outline. `¶` marks a record that has a text; `→ kind:id` a link the record makes, `← kind:id` a link
- * made to it. / Весь проект оглавлением; `¶` значит, что у записи есть текст; `→ вид:id` связь от записи, `← вид:id` связь к ней.
+ * made to it; `✎ draft` an unsaved text of the person is waiting for them to press Save.
+ * Весь проект оглавлением; `¶` значит, что у записи есть текст; `→ вид:id` связь от записи, `← вид:id` связь к ней; `✎ draft`:
+ * несохранённый текст человека ждёт его «Сохранить».
  */
-export function outlineText(project: AxisProject, records: readonly AxisRecord[], root?: string): string {
+export function outlineText(project: AxisProject, records: readonly AxisRecord[], root?: string, drafts: readonly string[] = []): string {
     const tree = buildTree(records);
     const incoming = incomingOf(records);
+    const withDraft = new Set(drafts);
     const lines: string[] = [];
     const walk = (nodes: readonly TreeNode[]): void => {
         for (const node of nodes) {
-            lines.push(line(node, incoming));
+            lines.push(line(node, incoming, withDraft));
             walk(node.children);
         }
     };
@@ -115,8 +120,18 @@ export function entryText(entry: JournalEntry): string {
     return `${when} ${entry.by} · ${what}${about}${entry.text ? ` — ${entry.text}` : ''}`;
 }
 
+/** What to tell about an unsaved draft of the text. / Что сказать о несохранённом черновике текста. */
+export const draftNote = (draft: AxisDraft): string =>
+    `draft: ${draft.by} has an unsaved text of this record since ${draft.at.slice(0, 16).replace('T', ' ')} (not in the text below); a new "text" now collides with it, so leave the text alone unless it is needed`;
+
 /** One record in full: where it is, what it says, what it is linked with, what happened to it. */
-export function recordText(record: AxisRecord, records: readonly AxisRecord[], journal: readonly JournalEntry[], assetPath: (name: string) => string): string {
+export function recordText(
+    record: AxisRecord,
+    records: readonly AxisRecord[],
+    journal: readonly JournalEntry[],
+    assetPath: (name: string) => string,
+    draft: AxisDraft | null = null,
+): string {
     const title = (id: string): string => records.find((r) => r.id === id)?.title ?? '(missing)';
     const path = pathOf(records, record.id)
         .slice(0, -1)
@@ -133,6 +148,7 @@ export function recordText(record: AxisRecord, records: readonly AxisRecord[], j
         out.push(`brainstorm: variant, rating: ${rating}${rating === 'good' ? ' (liked)' : rating === 'bad' ? ' (disliked)' : rating === 'disputed' ? ' (liked and disliked)' : ' (not rated)'}`);
         if (b.remark) out.push(`remark of the person: ${b.remark}`);
     } else if (b?.role === 'verdict') out.push('brainstorm: verdict');
+    if (draft) out.push(draftNote(draft));
     out.push(`created ${record.created.slice(0, 10)} by ${record.createdBy}, updated ${record.updated.slice(0, 16).replace('T', ' ')} by ${record.updatedBy}`);
     for (const link of record.links) out.push(`→ ${link.kind} [${link.to}] ${title(link.to)}`);
     for (const other of records) for (const link of other.links) if (link.to === record.id) out.push(`← ${link.kind} from [${other.id}] ${other.title}`);

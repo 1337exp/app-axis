@@ -12,7 +12,7 @@
 import { createInterface } from 'node:readline';
 import { waitingSeeds } from '../src/core/brainstorm.ts';
 import { BRAIN_ROLES, EXEC_EFFORTS, EXEC_MODELS, LINK_KINDS, RECORD_TYPES, STATUSES, isLinkKind } from '../src/core/model.ts';
-import { entryText, hitText, outlineText, recordText, search } from './agent.ts';
+import { draftNote, entryText, hitText, outlineText, recordText, search } from './agent.ts';
 import { dataDir } from './config.ts';
 import { AxisError, createStore } from './store.ts';
 import type { RecordInput } from './store.ts';
@@ -89,21 +89,21 @@ const tools: Tool[] = [
     {
         name: 'axis_overview',
         description:
-            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set). Links: "→ because:id" this record links to that one (kinds: because = it exists for that reason, depends = it waits for it, relates = near), "← because:id" that record links to this one; a decision with no "←" has nothing built on it yet.',
+            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read); "✎ draft" marks a record whose text the person is typing right now and has not saved (do not replace that text). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set). Links: "→ because:id" this record links to that one (kinds: because = it exists for that reason, depends = it waits for it, relates = near), "← because:id" that record links to this one; a decision with no "←" has nothing built on it yet.',
         inputSchema: { type: 'object', properties: { project, record: str('Optional: show only the branch under this record.') }, required: ['project'] },
         run(args) {
             const id = need(args, 'project');
-            return outlineText(store.project(id), store.records(id), typeof args.record === 'string' && args.record ? args.record : undefined);
+            return outlineText(store.project(id), store.records(id), typeof args.record === 'string' && args.record ? args.record : undefined, store.drafts(id));
         },
     },
     {
         name: 'axis_read',
-        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal. For a task the recommended executor and effort. For a brainstorm record also its role, whether a seed is handed to you, and for a variant the rating and the remark of the person.',
+        description: 'One record in full: its place in the tree, text, links both ways, children, pictures (as file paths you can open with Read) and its journal. For a task the recommended executor and effort. An unsaved draft of the person is named too. For a brainstorm record also its role, whether a seed is handed to you, and for a variant the rating and the remark of the person.',
         inputSchema: { type: 'object', properties: { project, id: recordId }, required: ['project', 'id'] },
         run(args) {
             const p = need(args, 'project');
             const record = store.record(p, need(args, 'id'));
-            return recordText(record, store.records(p), store.journal(p, { record: record.id, limit: 30 }), (name) => store.assetPath(p, name));
+            return recordText(record, store.records(p), store.journal(p, { record: record.id, limit: 30 }), (name) => store.assetPath(p, name), store.draft(p, record.id));
         },
     },
     {
@@ -161,8 +161,13 @@ const tools: Tool[] = [
         },
         run(args) {
             const { project: _p, id: _id, brain: _brain, ...patch } = args;
-            const record = store.updateRecord(need(args, 'project'), need(args, 'id'), patch as RecordInput, BY);
-            return `Updated [${record.id}] ${record.type}·${record.status}  ${record.title}`;
+            const project = need(args, 'project');
+            const id = need(args, 'id');
+            // the person may be typing this very text: say so (the change still goes through; the page shows its own conflict) / человек может набирать именно этот текст: говорим об этом (правка всё равно проходит; страница покажет свой конфликт)
+            const draft = patch.text !== undefined ? store.draft(project, id) : null;
+            const record = store.updateRecord(project, id, patch as RecordInput, BY);
+            return `Updated [${record.id}] ${record.type}·${record.status}  ${record.title}${draft ? `
+Warning: ${draftNote(draft)}` : ''}`;
         },
     },
     {
