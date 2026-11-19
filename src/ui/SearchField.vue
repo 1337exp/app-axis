@@ -68,7 +68,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKey));
         <TaoInput
             v-model="search.line"
             class="search__input"
-            size="small"
             :placeholder="t('search.placeholder')"
             :aria-label="t('search.label')"
             autocomplete="off"

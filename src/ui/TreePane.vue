@@ -253,7 +253,6 @@ async function add(): Promise<void> {
                         v-if="recordById(node.id)"
                         :items="menuOf(recordById(node.id)!)"
                         :menu-label="t('tree.actions')"
-                        size="small"
                         dots="horizontal"
                         :tabbable="false"
                         @select="(id: string) => act(id, recordById(node.id)!)"
