@@ -490,7 +490,10 @@ const stamp = (r: AxisRecord, which: 'created' | 'updated'): string => {
 
     <article v-else class="record" @paste="onPaste" @dragover.prevent @drop="onDrop">
         <!-- the sections above the record: a row of its own, only when there are some (no height reserved otherwise) / разделы над записью: своя строка, только когда они есть (иначе высоты не занимает) -->
-        <nav v-if="path.length > 0" class="record__path" aria-label="Path">
+        <!-- the path starts with the root «#»: a click on it closes the open record (in the drawer, the drawer) / путь начинается с корня «#»: клик по нему закрывает открытую запись (в ящике, ящик) -->
+        <nav class="record__path" :aria-label="t('record.path')">
+            <button type="button" class="record__step record__root" :aria-label="t('record.close')" :title="t('record.close')" @click="select(null)">#</button>
+            <span aria-hidden="true">/</span>
             <template v-for="step in path" :key="step.id">
                 <button type="button" class="record__step" @click="select(step.id)">{{ step.title }}</button>
                 <span aria-hidden="true">/</span>

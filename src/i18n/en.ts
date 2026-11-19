@@ -167,6 +167,8 @@ const en: typeof ru = {
     },
     record: {
         none: 'No record selected',
+        path: 'Path',
+        close: 'Close the record',
         noneText: 'Pick a record in the tree on the left or add a new one.',
         title: 'Title',
         type: 'Type',

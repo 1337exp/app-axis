@@ -49,7 +49,14 @@ const toTao = (nodes: readonly TreeNode[]): TaoTreeNode[] =>
         .filter((node) => !kept.value || kept.value.has(node.record.id))
         .map((node) => {
             const children = toTao(node.children);
-            return { id: node.record.id, label: node.record.title, ...(children.length > 0 ? { children } : {}) };
+            // the record open in the pane is marked in the tree, since a single click only picks / открытая справа запись помечена в дереве, ведь одинарный клик только выбирает
+            const shown = node.record.id === state.selected;
+            return {
+                id: node.record.id,
+                label: node.record.title,
+                ...(shown ? { tone: 'accent' as const } : {}),
+                ...(children.length > 0 ? { children } : {}),
+            };
         });
 const nodes = computed(() => toTao(tree.value));
 
