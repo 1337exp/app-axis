@@ -136,7 +136,9 @@ async function run(work: () => Promise<unknown>): Promise<void> {
     }
 }
 
-function menuOf(record: AxisRecord): TaoMenuItem[] {
+/** The items of a row: the «⋯» button and the right click of the tree show the same list. / Пункты строки: кнопка «⋯» и правый клик по дереву показывают один список. */
+function menuOf(record: AxisRecord | undefined): TaoMenuItem[] {
+    if (!record) return [];
     return [
         { id: 'add', label: t('tree.addChild'), icon: 'tao-plus' },
         { type: 'separator' },
@@ -226,7 +228,16 @@ async function add(): Promise<void> {
         <div class="tree-pane__scroll">
             <SearchEmpty v-if="nodes.length === 0 && kept" />
             <TaoEmpty v-else-if="nodes.length === 0" :title="t('tree.empty')">{{ t('tree.emptyText') }}</TaoEmpty>
-            <TaoTree v-else v-model:expanded="shownExpanded" v-model:selected="selected" :nodes="nodes" :aria-label="t('tree.label')">
+            <TaoTree
+                v-else
+                v-model:expanded="shownExpanded"
+                v-model:selected="selected"
+                :nodes="nodes"
+                :aria-label="t('tree.label')"
+                :menu="(node: TaoTreeNode) => menuOf(recordById(node.id))"
+                :menu-label="t('tree.actions')"
+                @menu-select="(id: string, node: TaoTreeNode) => act(id, recordById(node.id)!)"
+            >
                 <template #icon="{ node }">
                     <template v-for="r in [row(node.id)]" :key="node.id">
                         <StatusMark v-if="r" :record="r.record" :tabbable="false" />
