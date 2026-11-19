@@ -141,7 +141,7 @@ describe('roundState', () => {
         expect(roundState(one([seed('s'), verdict('d', 's', { type: 'note', status: 'done' })]))).toBe('verdict');
     });
 
-    it('finds the seeds that wait for Claude', () => {
+    it('finds the seeds that wait for the agent', () => {
         const records = [seed('a', { handed: true }), seed('b'), rec('c'), seed('d', { handed: true }), variant('v', 'a')];
         expect(waitingSeeds(records).map((r) => r.id)).toEqual(['a', 'd']);
     });
@@ -196,7 +196,7 @@ describe('the store and the brainstorm rules', () => {
 
     it('changes only the fields passed, and clears with null or an empty role', () => {
         const s = newSeed(false);
-        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'claude');
+        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'agent');
         expect(v.brain).toEqual(brain('variant'));
         const liked = store.updateRecord('demo', v.id, { brain: { like: true } }, 'user');
         expect(liked.brain).toEqual(brain('variant', { like: true }));
@@ -233,46 +233,46 @@ describe('the store and the brainstorm rules', () => {
         expect(status(() => store.createRecord('demo', { type: 'idea', title: 'x', role: 'boss' }, 'user'))).toBe(400);
     });
 
-    it('lets Claude set only the role', () => {
+    it('lets the agent set only the role', () => {
         const s = newSeed(false);
-        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'claude');
-        const tried = store.updateRecord('demo', v.id, { brain: { like: true, dislike: true, remark: 'mine', handed: true } }, 'claude');
+        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'agent');
+        const tried = store.updateRecord('demo', v.id, { brain: { like: true, dislike: true, remark: 'mine', handed: true } }, 'agent');
         expect(tried.brain).toEqual(brain('variant'));
-        const asked = store.updateRecord('demo', s.id, { brain: { handed: true } }, 'claude');
+        const asked = store.updateRecord('demo', s.id, { brain: { handed: true } }, 'agent');
         expect(asked.brain!.handed).toBe(false);
-        const made = store.createRecord('demo', { type: 'idea', title: 'W', parent: s.id, brain: { role: 'variant', like: true } }, 'claude');
+        const made = store.createRecord('demo', { type: 'idea', title: 'W', parent: s.id, brain: { role: 'variant', like: true } }, 'agent');
         expect(made.brain).toEqual(brain('variant'));
     });
 
     it('clears handed when a verdict is added under the seed, with a line in the journal', () => {
         const s = newSeed(true);
         expect(store.record('demo', s.id).brain!.handed).toBe(true);
-        const d = store.createRecord('demo', { type: 'note', title: 'Verdict', parent: s.id, role: 'verdict', why: 'rated' }, 'claude');
+        const d = store.createRecord('demo', { type: 'note', title: 'Verdict', parent: s.id, role: 'verdict', why: 'rated' }, 'agent');
         expect(d.brain).toEqual(brain('verdict'));
         expect(store.record('demo', s.id).brain!.handed).toBe(false);
         const [last, previous] = store.journal('demo');
-        expect(last).toMatchObject({ kind: 'update', by: 'claude', record: s.id, changes: { handed: ['yes', ''] }, text: 'verdict added, turn passed back to the person' });
+        expect(last).toMatchObject({ kind: 'update', by: 'agent', record: s.id, changes: { handed: ['yes', ''] }, text: 'verdict added, turn passed back to the person' });
         expect(previous).toMatchObject({ kind: 'create', record: d.id });
     });
 
     it('clears handed when variants are added too, so the seed does not keep waiting while the person rates', () => {
         const s = newSeed(true);
-        store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'claude');
+        store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'agent');
         expect(store.record('demo', s.id).brain!.handed).toBe(false);
         expect(store.journal('demo')[0]).toMatchObject({ record: s.id, text: 'variant added, turn passed back to the person' });
     });
 
     it('clears handed when an existing record becomes a verdict under a seed, and not otherwise', () => {
         const s = newSeed(true);
-        const note = store.createRecord('demo', { type: 'note', title: 'Later a verdict', parent: s.id }, 'claude');
+        const note = store.createRecord('demo', { type: 'note', title: 'Later a verdict', parent: s.id }, 'agent');
         expect(store.record('demo', s.id).brain!.handed).toBe(true); // an ordinary child changes nothing
-        store.updateRecord('demo', note.id, { title: 'Renamed' }, 'claude');
+        store.updateRecord('demo', note.id, { title: 'Renamed' }, 'agent');
         expect(store.record('demo', s.id).brain!.handed).toBe(true);
-        store.updateRecord('demo', note.id, { role: 'verdict' }, 'claude');
+        store.updateRecord('demo', note.id, { role: 'verdict' }, 'agent');
         expect(store.record('demo', s.id).brain!.handed).toBe(false);
         // a verdict somewhere else does not touch a handed seed
         const other = newSeed(true);
-        const stray = store.createRecord('demo', { type: 'note', title: 'Stray', role: 'verdict' }, 'claude');
+        const stray = store.createRecord('demo', { type: 'note', title: 'Stray', role: 'verdict' }, 'agent');
         expect(stray.brain!.role).toBe('verdict');
         expect(store.record('demo', other.id).brain!.handed).toBe(true);
         // a person rating a variant leaves the turn alone
@@ -286,7 +286,7 @@ describe('the store and the brainstorm rules', () => {
 
     it('writes readable journal lines for rating and handing', () => {
         const s = newSeed(false);
-        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'claude');
+        const v = store.createRecord('demo', { type: 'idea', title: 'V', parent: s.id, role: 'variant' }, 'agent');
         store.updateRecord('demo', v.id, { brain: { like: true } }, 'user');
         expect(store.journal('demo')[0]).toMatchObject({ by: 'user', kind: 'update', changes: { rating: ['neutral', 'good'] } });
         store.updateRecord('demo', v.id, { brain: { remark: 'because' } }, 'user');
@@ -304,7 +304,7 @@ describe('the store and the brainstorm rules', () => {
 
     it('leaves the search, the tree and the progress as they were', () => {
         const s = newSeed(true);
-        store.createRecord('demo', { type: 'idea', title: 'Variant about rockets', parent: s.id, role: 'variant' }, 'claude');
+        store.createRecord('demo', { type: 'idea', title: 'Variant about rockets', parent: s.id, role: 'variant' }, 'agent');
         const records = store.records('demo');
         expect(records).toHaveLength(2);
         expect(store.projects()[0]!.progress.total).toBe(0);
@@ -326,14 +326,14 @@ describe('what the agent sees', () => {
         const good = store.createRecord('demo', { type: 'idea', title: 'Good', parent: s.id, brain: { role: 'variant', like: true, remark: 'yes' } }, 'user');
         store.createRecord('demo', { type: 'idea', title: 'Bad', parent: s.id, brain: { role: 'variant', dislike: true } }, 'user');
         store.createRecord('demo', { type: 'idea', title: 'Both', parent: s.id, brain: { role: 'variant', like: true, dislike: true } }, 'user');
-        store.createRecord('demo', { type: 'idea', title: 'Plain', parent: s.id, role: 'variant' }, 'claude');
+        store.createRecord('demo', { type: 'idea', title: 'Plain', parent: s.id, role: 'variant' }, 'agent');
         const lines = outlineText(store.project('demo'), store.records('demo')).split('\n');
         const of = (title: string) => lines.find((l) => l.includes(`  ${title}`))!;
-        // the first variant of Claude passed the turn back, so the seed shows no wait mark here: hand it again
+        // the first variant of the agent passed the turn back, so the seed shows no wait mark here: hand it again
         expect(of('Seed').endsWith('seed')).toBe(true);
         store.updateRecord('demo', s.id, { brain: { handed: true } }, 'user');
         const handed = outlineText(store.project('demo'), store.records('demo')).split('\n').find((l) => l.includes('  Seed'))!;
-        expect(handed.endsWith('seed  ⏳ waits for Claude')).toBe(true);
+        expect(handed.endsWith('seed  ⏳ waits for the agent')).toBe(true);
         expect(of('Good').endsWith('variant + ✎')).toBe(true);
         expect(of('Bad').endsWith('variant -')).toBe(true);
         expect(of('Both').endsWith('variant ±')).toBe(true);
@@ -372,14 +372,14 @@ describe('the MCP server', () => {
         return run.stdout.trim().split('\n').map((l) => (JSON.parse(l) as { result: { content: { text: string }[] } }).result.content[0]!.text);
     };
 
-    it('counts the rounds that wait, adds a role, and takes no ratings from Claude', () => {
+    it('counts the rounds that wait, adds a role, and takes no ratings from the agent', () => {
         const [projects, overview] = call([
             { name: 'axis_projects', arguments: {} },
             { name: 'axis_overview', arguments: { project: 'demo' } },
         ]);
-        expect(projects).toContain('1 round waits for Claude');
+        expect(projects).toContain('1 round waits for the agent');
         const seedId = /\[(\w{8})\]/.exec(overview!)![1]!;
-        expect(overview).toContain('seed  ⏳ waits for Claude');
+        expect(overview).toContain('seed  ⏳ waits for the agent');
 
         const [added, readSeed, projectsAfter] = call([
             { name: 'axis_add', arguments: { project: 'demo', type: 'idea', title: 'Option', parent: seedId, role: 'variant', brain: { role: 'variant', like: true, remark: 'sneaky', handed: true } } },

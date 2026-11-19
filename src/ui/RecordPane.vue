@@ -225,7 +225,7 @@ const textMoved = computed(() => {
     return !(baseText.value && same(r.body, baseText.value.doc));
 });
 
-// a change from elsewhere (Claude, another tab) or from this page (status, due): the draft is NOT reloaded, the typing is safe
+// a change from elsewhere (the agent, another tab) or from this page (status, due): the draft is NOT reloaded, the typing is safe
 watch(
     () => record.value?.updated,
     () => {

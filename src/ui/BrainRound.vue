@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * One round of a brainstorm: the idea (seed) with its state and the button that hands the turn over, the variants of
- * Claude to rate, the verdict (which can be accepted as a decision) and a box to reply to it. An older round is folded
+ * the agent to rate, the verdict (which can be accepted as a decision) and a box to reply to it. An older round is folded
  * to one line (the idea and the start of the verdict); the last one is open. The state is `roundState`, nothing here is stored.
  *
- * Один раунд брейншторма: задумка (seed) с её состоянием и кнопкой передачи хода, варианты Claude для оценки, вердикт
+ * Один раунд брейншторма: задумка (seed) с её состоянием и кнопкой передачи хода, варианты агента для оценки, вердикт
  * (его можно принять как решение) и поле для ответа. Старый раунд свёрнут в одну строку (задумка и начало вердикта);
  * последний открыт. Состояние это `roundState`, ничего здесь не хранится.
  */
@@ -56,7 +56,7 @@ async function accept(): Promise<void> {
     }
 }
 
-/** A reply is a new idea under the verdict, handed to Claude at once. / Ответ это новая задумка под вердиктом, сразу переданная Claude. */
+/** A reply is a new idea under the verdict, handed to the agent at once. / Ответ это новая задумка под вердиктом, сразу переданная агенту. */
 const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.round.verdict!.id, handed: true });
 </script>
 
@@ -73,7 +73,7 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
             <section class="seed">
                 <header class="seed__head">
                     <TaoIcon class="seed__icon" name="type-idea" />
-                    <TaoTooltip class="title-tip" :content="t('brain.openRecord')"><button type="button" class="seed__title" @click="select(round.seed.id)">{{ round.seed.title }}</button></TaoTooltip>
+                    <button type="button" class="seed__title" @click="select(round.seed.id)">{{ round.seed.title }}</button>
                     <span class="chip" :class="`chip--${state}`">{{ t(`brain.state.${state}`) }}</span>
                     <TaoButton v-if="state === 'draft' || state === 'rating'" size="small" icon="brainstorm" @click="hand(true)">{{ t('brain.hand') }}</TaoButton>
                     <TaoButton v-else-if="state === 'waiting'" size="small" variant="secondary" tone="neutral" @click="hand(false)">{{ t('brain.take') }}</TaoButton>
@@ -97,7 +97,7 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
                 <header class="verdict__head">
                     <TaoIcon :name="accepted ? 'type-decision' : 'type-note'" />
                     <h3 class="label label--inline">{{ accepted ? t('brain.accepted') : t('brain.verdict') }}</h3>
-                    <TaoTooltip class="title-tip" :content="t('brain.openRecord')"><button type="button" class="verdict__title" @click="select(round.verdict.id)">{{ round.verdict.title }}</button></TaoTooltip>
+                    <button type="button" class="verdict__title" @click="select(round.verdict.id)">{{ round.verdict.title }}</button>
                     <TaoButton v-if="!accepted" size="small" variant="secondary" tone="neutral" icon="type-decision" @click="accept">{{ t('brain.accept') }}</TaoButton>
                 </header>
                 <BrainText :body="round.verdict.body" />
@@ -204,14 +204,10 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
     color: var(--tao-color-text-muted);
 }
 
-/* the tooltip wrapper is the flex item that takes the free width; the button is the text inside it / обёртка подсказки это flex-элемент, занимающий свободную ширину; кнопка это текст внутри неё */
-.title-tip {
-    flex: 1;
-    min-width: 8em;
-}
-
 .seed__title,
 .verdict__title {
+    flex: 1;
+    min-width: 8em;
     padding: 0;
     border: 0;
     background: none;
@@ -235,7 +231,7 @@ const reply = (text: string): Promise<unknown> => addSeed(text, { parent: props.
     outline-offset: 2px;
 }
 
-/* the state is words in a quiet frame, not a colour (colour is for status only): the turn of Claude is a bolder word / состояние это слова в тихой рамке, не цвет (цвет только у статуса): ход Claude выделен жирным словом */
+/* the state is words in a quiet frame, not a colour (colour is for status only): the turn of the agent is a bolder word / состояние это слова в тихой рамке, не цвет (цвет только у статуса): ход агента выделен жирным словом */
 .chip {
     flex: none;
     padding: 1px var(--tao-space-2);

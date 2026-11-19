@@ -1,6 +1,6 @@
 /**
- * Claude sees through MCP that the person is typing a text: a mark in the outline, a line in a full read, a warning when it sends its own text.
- * Claude видит через MCP, что человек набирает текст: метка в оглавлении, строка в полном чтении, предупреждение, когда шлёт свой текст.
+ * The agent sees through MCP that the person is typing a text: a mark in the outline, a line in a full read, a warning when it sends its own text.
+ * Агент видит через MCP, что человек набирает текст: метка в оглавлении, строка в полном чтении, предупреждение, когда шлёт свой текст.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -53,13 +53,13 @@ describe('an unsaved draft in MCP', () => {
 
     it('warns when a text is sent to a record with a draft, and still saves it', () => {
         const [withDraft, without, status] = call([
-            { name: 'axis_update', arguments: { project: 'demo', id: a, text: 'from Claude' } },
-            { name: 'axis_update', arguments: { project: 'demo', id: b, text: 'from Claude' } },
+            { name: 'axis_update', arguments: { project: 'demo', id: a, text: 'from the agent' } },
+            { name: 'axis_update', arguments: { project: 'demo', id: b, text: 'from the agent' } },
             { name: 'axis_update', arguments: { project: 'demo', id: a, status: 'active' } },
         ]);
         expect(withDraft).toContain('Warning: draft:');
         expect(without).not.toContain('Warning');
         expect(status).not.toContain('Warning'); // only the text collides with a draft of the text
-        expect(docToText(createStore(root).record('demo', a).body)).toBe('from Claude');
+        expect(docToText(createStore(root).record('demo', a).body)).toBe('from the agent');
     });
 });

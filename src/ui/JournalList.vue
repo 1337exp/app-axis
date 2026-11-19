@@ -124,7 +124,7 @@ function changes(entry: JournalEntry): string[] {
     color: var(--tao-color-text);
 }
 
-.entry__by--claude {
+.entry__by--agent {
     color: var(--tao-color-text-strong);
 }
 

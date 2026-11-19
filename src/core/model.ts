@@ -33,8 +33,8 @@ export type Status = (typeof STATUSES)[number];
 export const LINK_KINDS = ['relates', 'depends', 'because'] as const;
 export type LinkKind = (typeof LINK_KINDS)[number];
 
-/** Who did it: the person or Claude. / Кто сделал: человек или Claude. */
-export const AUTHORS = ['user', 'claude'] as const;
+/** Who did it: the person or the agent (an assistant connected over MCP). / Кто сделал: человек или агент (ассистент, подключённый по MCP). */
+export const AUTHORS = ['user', 'agent'] as const;
 export type Author = (typeof AUTHORS)[number];
 
 export interface RecordLink {
@@ -43,11 +43,11 @@ export interface RecordLink {
 }
 
 /**
- * The part a record plays in a brainstorm round: `seed` (the person's starting thought), `variant` (what Claude
- * offers under a seed), `verdict` (Claude's summary under a seed after the person rated the variants).
+ * The part a record plays in a brainstorm round: `seed` (the person's starting thought), `variant` (what the agent
+ * offers under a seed), `verdict` (the agent's summary under a seed after the person rated the variants).
  *
- * Роль записи в раунде брейншторма: `seed` (задумка человека), `variant` (вариант Claude под задумкой),
- * `verdict` (вердикт Claude под задумкой после оценок человека).
+ * Роль записи в раунде брейншторма: `seed` (задумка человека), `variant` (вариант агента под задумкой),
+ * `verdict` (вердикт агента под задумкой после оценок человека).
  */
 export const BRAIN_ROLES = ['seed', 'variant', 'verdict'] as const;
 export type BrainRole = (typeof BRAIN_ROLES)[number];
@@ -57,10 +57,10 @@ export const BRAIN_REMARK_MAX = 1000;
 
 /**
  * The brainstorm field of a record. `like`, `dislike` and `remark` mean something only on a `variant`, `handed`
- * only on a `seed` (the turn is passed to Claude); on other roles they are always off/empty.
+ * only on a `seed` (the turn is passed to the agent); on other roles they are always off/empty.
  *
  * Поле брейншторма у записи. `like`, `dislike` и `remark` имеют смысл только у `variant`, `handed` только у `seed`
- * (ход передан Claude); у других ролей они всегда выключены/пусты.
+ * (ход передан агенту); у других ролей они всегда выключены/пусты.
  */
 export interface Brain {
     role: BrainRole;
@@ -94,11 +94,11 @@ export function normalizeBrain(raw: unknown): Brain | null {
 }
 
 /**
- * Who should do a task and how hard to think: a recommendation, not a command. Claude sets it when it breaks work down,
+ * Who should do a task and how hard to think: a recommendation, not a command. The agent sets it when it breaks work down,
  * the person may change it. `haiku` is for trivial and mechanical work, `sonnet` for most implementation, `opus` for hard
  * design or risky work.
  *
- * Кто должен делать задачу и как усердно думать: рекомендация, не приказ. Claude ставит её при разборе работы,
+ * Кто должен делать задачу и как усердно думать: рекомендация, не приказ. Агент ставит её при разборе работы,
  * человек может поправить. `haiku` для простого и механического, `sonnet` для большей части реализации, `opus` для
  * трудного проектирования и рискованной работы.
  */
@@ -213,6 +213,14 @@ export const isStatus = (value: unknown): value is Status => STATUSES.includes(v
 export const isLinkKind = (value: unknown): value is LinkKind => LINK_KINDS.includes(value as LinkKind);
 export const isAuthor = (value: unknown): value is Author => AUTHORS.includes(value as Author);
 
+/**
+ * Any stored or sent author as one of ours. `claude` is what the agent was called before it got a neutral name: files written then
+ * still say so, and are read as `agent`.
+ * Любой записанный или присланный автор как один из наших. `claude`: так агент назывался, пока у него не было нейтрального имени;
+ * файлы, записанные тогда, так и говорят, и читаются как `agent`.
+ */
+export const toAuthor = (value: unknown): Author => (value === 'agent' || value === 'claude' ? 'agent' : 'user');
+
 const ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 /** A safe id: also a file or folder name, so nothing but lower latin, digits, `-` and `_`. */
 export const isId = (value: unknown): value is string => typeof value === 'string' && ID.test(value);
@@ -275,7 +283,7 @@ export function normalizeRecord(raw: unknown, now: string): AxisRecord | null {
         exec: type === 'task' ? normalizeExec(r.exec) : null,
         created: day(r.created),
         updated: day(r.updated),
-        createdBy: isAuthor(r.createdBy) ? r.createdBy : 'user',
-        updatedBy: isAuthor(r.updatedBy) ? r.updatedBy : 'user',
+        createdBy: toAuthor(r.createdBy),
+        updatedBy: toAuthor(r.updatedBy),
     };
 }

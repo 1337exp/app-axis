@@ -65,17 +65,17 @@ describe('the draft over HTTP', () => {
 
     it('answers 409 with the current record to a save made against an older version', async () => {
         const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'old' }, 'user');
-        const theirs = store.updateRecord('demo', r.id, { text: 'theirs' }, 'claude');
+        const theirs = store.updateRecord('demo', r.id, { text: 'theirs' }, 'agent');
         const refused = await send('PATCH', `/records/${r.id}`, { body: paragraph('mine'), base: r.updated });
         expect(refused.status).toBe(409);
         expect(refused.data.error).toBeTypeOf('string');
-        expect(refused.data.record).toMatchObject({ id: r.id, updated: theirs.updated, updatedBy: 'claude' });
+        expect(refused.data.record).toMatchObject({ id: r.id, updated: theirs.updated, updatedBy: 'agent' });
 
         const forced = await send('PATCH', `/records/${r.id}`, { body: paragraph('mine'), base: theirs.updated });
         expect(forced.status).toBe(200);
         expect(forced.data.record.updatedBy).toBe('user');
         // without a base (MCP, curl) nothing is checked
-        expect((await send('PATCH', `/records/${r.id}`, { text: 'again' }, 'claude')).status).toBe(200);
+        expect((await send('PATCH', `/records/${r.id}`, { text: 'again' }, 'agent')).status).toBe(200);
     });
 });
 
@@ -116,7 +116,7 @@ describe('the brainstorm field over HTTP', () => {
         expect(seed.status).toBe(201);
         expect(seed.data.record.brain).toEqual({ role: 'seed', like: false, dislike: false, remark: '', handed: false });
         const sid = seed.data.record.id as string;
-        const made = await send('POST', '/records', { type: 'idea', title: 'Option', parent: sid, role: 'variant' }, 'claude');
+        const made = await send('POST', '/records', { type: 'idea', title: 'Option', parent: sid, role: 'variant' }, 'agent');
         const vid = made.data.record.id as string;
 
         // only the keys passed change
@@ -133,14 +133,14 @@ describe('the brainstorm field over HTTP', () => {
         expect((await send('PATCH', `/records/${vid}`, { brain: { like: 'yes' } })).status).toBe(400);
         expect((await send('PATCH', `/records/${vid}`, { role: 'boss' })).status).toBe(400);
 
-        // Claude over HTTP is the same as through MCP: the role only
-        const sneaky = await send('PATCH', `/records/${vid}`, { brain: { dislike: true } }, 'claude');
+        // The agent over HTTP is the same as through MCP: the role only
+        const sneaky = await send('PATCH', `/records/${vid}`, { brain: { dislike: true } }, 'agent');
         expect(sneaky.data.record.brain.dislike).toBe(false);
 
         // the journal says what changed, and a verdict hands the turn back
         const entry = (await send('GET', `/records/${sid}`)).data.journal[0];
         expect(entry).toMatchObject({ kind: 'update', changes: { handed: ['', 'yes'] } });
-        const verdict = await send('POST', '/records', { type: 'note', title: 'Verdict', parent: sid, role: 'verdict' }, 'claude');
+        const verdict = await send('POST', '/records', { type: 'note', title: 'Verdict', parent: sid, role: 'verdict' }, 'agent');
         expect(verdict.status).toBe(201);
         const after = (await send('GET', '')).data.records as { id: string; brain: { handed: boolean } | null }[];
         expect(after.find((r) => r.id === sid)!.brain!.handed).toBe(false);

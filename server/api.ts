@@ -10,7 +10,7 @@
 import { createReadStream, watch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { isAuthor, isId } from '../src/core/model.ts';
+import { isId, toAuthor } from '../src/core/model.ts';
 import type { Author } from '../src/core/model.ts';
 import { ASSET_MAX_BYTES, AxisError } from './store.ts';
 import type { DraftInput, ProjectInput, RecordInput, Store } from './store.ts';
@@ -126,7 +126,7 @@ export function createApi(store: Store): Api {
 
     const author = (req: IncomingMessage): Author => {
         const by = req.headers['x-axis-by'];
-        return isAuthor(by) ? by : 'user';
+        return toAuthor(by);
     };
 
     async function route(req: IncomingMessage, res: ServerResponse, path: string[], url: URL): Promise<void> {

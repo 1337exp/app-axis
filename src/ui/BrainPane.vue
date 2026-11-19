@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * The brainstorm: ideas developed in rounds with Claude. At the top a box for a new idea; below, the threads. A thread is a
- * chain of rounds: an idea, the variants of Claude, the rating of the person, the verdict, the reply (which is the next
+ * The brainstorm: ideas developed in rounds with the agent. At the top a box for a new idea; below, the threads. A thread is a
+ * chain of rounds: an idea, the variants of the agent, the rating of the person, the verdict, the reply (which is the next
  * idea). The rounds are built from the records by `core/brainstorm.ts`; the records stay ordinary ones, so the tree, the
  * board and the rest see them as before. A click on a title opens the record in the drawer on the right.
  *
- * Брейншторм: идеи, которые развиваются раундами вместе с Claude. Сверху поле для новой задумки, ниже нити. Нить это
- * цепочка раундов: задумка, варианты Claude, оценка человека, вердикт, ответ (он же следующая задумка). Раунды собирает
+ * Брейншторм: идеи, которые развиваются раундами вместе с агентом. Сверху поле для новой задумки, ниже нити. Нить это
+ * цепочка раундов: задумка, варианты агента, оценка человека, вердикт, ответ (он же следующая задумка). Раунды собирает
  * из записей `core/brainstorm.ts`; записи остаются обычными, поэтому дерево, доска и остальное видят их как раньше.
  * Клик по заголовку открывает запись в панели справа.
  */

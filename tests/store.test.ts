@@ -50,17 +50,17 @@ describe('records', () => {
     it('creates with defaults, in order, with a journal line', () => {
         const area = store.createRecord('demo', { type: 'area', title: 'Editor' }, 'user');
         const a = store.createRecord('demo', { type: 'task', title: 'A', parent: area.id }, 'user');
-        const b = store.createRecord('demo', { type: 'task', title: 'B', parent: area.id }, 'claude');
+        const b = store.createRecord('demo', { type: 'task', title: 'B', parent: area.id }, 'agent');
         store.createRecord('demo', { type: 'task', title: 'First', parent: area.id, after: null }, 'user');
-        const mid = store.createRecord('demo', { type: 'decision', title: 'Mid', parent: area.id, after: a.id, why: 'because' }, 'claude');
+        const mid = store.createRecord('demo', { type: 'decision', title: 'Mid', parent: area.id, after: a.id, why: 'because' }, 'agent');
         expect(mid.status).toBe('done'); // a decision written down is made
         expect(a.status).toBe('open');
-        expect(b.createdBy).toBe('claude');
+        expect(b.createdBy).toBe('agent');
         const order = store.records('demo').filter((r) => r.parent === area.id).sort((x, y) => x.order - y.order).map((r) => r.title);
         expect(order).toEqual(['First', 'A', 'Mid', 'B']);
         const journal = store.journal('demo');
         expect(journal).toHaveLength(5);
-        expect(journal[0]).toMatchObject({ kind: 'create', by: 'claude', record: mid.id, title: 'Mid', text: 'because' });
+        expect(journal[0]).toMatchObject({ kind: 'create', by: 'agent', record: mid.id, title: 'Mid', text: 'because' });
     });
 
     it('refuses what is not valid', () => {
@@ -73,10 +73,10 @@ describe('records', () => {
     });
 
     it('takes the body as text and keeps it as a document', () => {
-        const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'Hello **world**\n\n- one\n- two' }, 'claude');
+        const r = store.createRecord('demo', { type: 'note', title: 'N', text: 'Hello **world**\n\n- one\n- two' }, 'agent');
         expect(r.body?.v).toBe(1);
         expect(docToText(store.record('demo', r.id).body)).toBe('Hello **world**\n\n- one\n- two');
-        expect(store.updateRecord('demo', r.id, { text: '   ' }, 'claude').body).toBeNull();
+        expect(store.updateRecord('demo', r.id, { text: '   ' }, 'agent').body).toBeNull();
         // a body from the page goes through the editor's gate: what is not a document does not get in
         const dirty = store.updateRecord('demo', r.id, { body: { v: 1, content: [{ type: 'script', content: [{ type: 'text', text: 'x' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'ok' }] }] } }, 'user');
         expect(JSON.stringify(dirty.body)).not.toContain('script');
@@ -85,12 +85,12 @@ describe('records', () => {
 
     it('updates only what is given and writes what changed', () => {
         const r = store.createRecord('demo', { type: 'task', title: 'T', due: '2026-12-01' }, 'user');
-        const same = store.updateRecord('demo', r.id, { title: 'T' }, 'claude');
+        const same = store.updateRecord('demo', r.id, { title: 'T' }, 'agent');
         expect(same.updated).toBe(r.updated); // nothing changed: nothing written
         expect(same.updatedBy).toBe('user');
-        const done = store.updateRecord('demo', r.id, { status: 'done', why: 'checked in the browser' }, 'claude');
-        expect(done).toMatchObject({ status: 'done', title: 'T', due: '2026-12-01', updatedBy: 'claude' });
-        expect(store.journal('demo')[0]).toMatchObject({ kind: 'update', by: 'claude', changes: { status: ['open', 'done'] }, text: 'checked in the browser' });
+        const done = store.updateRecord('demo', r.id, { status: 'done', why: 'checked in the browser' }, 'agent');
+        expect(done).toMatchObject({ status: 'done', title: 'T', due: '2026-12-01', updatedBy: 'agent' });
+        expect(store.journal('demo')[0]).toMatchObject({ kind: 'update', by: 'agent', changes: { status: ['open', 'done'] }, text: 'checked in the browser' });
         expect(store.updateRecord('demo', r.id, { due: '' }, 'user').due).toBeNull();
         expect(status(() => store.updateRecord('demo', r.id, { status: 'x' }, 'user'))).toBe(400);
         expect(status(() => store.updateRecord('demo', 'missing1', { title: 'x' }, 'user'))).toBe(404);
@@ -114,7 +114,7 @@ describe('records', () => {
     it('links to records that exist, once', () => {
         const a = store.createRecord('demo', { type: 'decision', title: 'D' }, 'user');
         const b = store.createRecord('demo', { type: 'task', title: 'T' }, 'user');
-        const linked = store.updateRecord('demo', b.id, { links: [{ to: a.id, kind: 'because' }, { to: a.id, kind: 'because' }] }, 'claude');
+        const linked = store.updateRecord('demo', b.id, { links: [{ to: a.id, kind: 'because' }, { to: a.id, kind: 'because' }] }, 'agent');
         expect(linked.links).toEqual([{ to: a.id, kind: 'because' }]);
         expect(status(() => store.updateRecord('demo', b.id, { links: [{ to: b.id, kind: 'relates' }] }, 'user'))).toBe(400);
         expect(status(() => store.updateRecord('demo', b.id, { links: [{ to: 'missing1', kind: 'relates' }] }, 'user'))).toBe(404);
@@ -164,8 +164,8 @@ describe('drafts', () => {
 
         // typing again replaces it, however often: the record and the journal stay as they were
         store.saveDraft('demo', r.id, { body: paragraph('new, typed slowly, more'), base: r.updated }, 'user');
-        store.saveDraft('demo', r.id, { body: paragraph('and more') }, 'claude'); // no base: the draft keeps its own
-        expect(store.draft('demo', r.id)).toMatchObject({ base: r.updated, by: 'claude' });
+        store.saveDraft('demo', r.id, { body: paragraph('and more') }, 'agent'); // no base: the draft keeps its own
+        expect(store.draft('demo', r.id)).toMatchObject({ base: r.updated, by: 'agent' });
         expect(docToText(store.record('demo', r.id).body)).toBe('old');
         expect(store.record('demo', r.id).updated).toBe(r.updated);
         expect(store.journal('demo')).toHaveLength(lines);
@@ -223,8 +223,8 @@ describe('drafts', () => {
         expect(docToText(ok.body)).toBe('mine');
         expect(store.journal('demo')[0]).toMatchObject({ kind: 'update', changes: { body: ['', ''] } });
 
-        // somebody else (Claude through MCP: no base) changed the text meanwhile
-        const theirs = store.updateRecord('demo', r.id, { text: 'theirs' }, 'claude');
+        // somebody else (the agent through MCP: no base) changed the text meanwhile
+        const theirs = store.updateRecord('demo', r.id, { text: 'theirs' }, 'agent');
         const lines = store.journal('demo').length;
         let refused: unknown;
         try {
@@ -243,7 +243,7 @@ describe('drafts', () => {
         const forced = store.updateRecord('demo', r.id, { body: paragraph('mine again'), base: theirs.updated }, 'user');
         expect(docToText(forced.body)).toBe('mine again');
         // callers that send no base (MCP) are never refused
-        expect(docToText(store.updateRecord('demo', r.id, { text: 'from mcp' }, 'claude').body)).toBe('from mcp');
+        expect(docToText(store.updateRecord('demo', r.id, { text: 'from mcp' }, 'agent').body)).toBe('from mcp');
         expect(status(() => store.updateRecord('demo', r.id, { body: null, base: 7 }, 'user'))).toBe(400);
     });
 });
@@ -251,8 +251,8 @@ describe('drafts', () => {
 describe('journal and assets', () => {
     it('keeps free notes, newest first, and filters by record', () => {
         const r = store.createRecord('demo', { type: 'task', title: 'T' }, 'user');
-        store.log('demo', 'about the project', undefined, 'claude');
-        store.log('demo', 'about the task', r.id, 'claude');
+        store.log('demo', 'about the project', undefined, 'agent');
+        store.log('demo', 'about the task', r.id, 'agent');
         expect(store.journal('demo').map((e) => e.kind)).toEqual(['note', 'note', 'create']);
         expect(store.journal('demo', { record: r.id }).map((e) => e.text ?? e.kind)).toEqual(['about the task', 'create']);
         expect(store.journal('demo', { limit: 1 })).toHaveLength(1);
@@ -283,7 +283,7 @@ describe('journal and assets', () => {
 describe('what the agent sees', () => {
     it('prints an outline, a record and finds by words', () => {
         const area = store.createRecord('demo', { type: 'area', title: 'Редактор' }, 'user');
-        const d = store.createRecord('demo', { type: 'decision', title: 'Проект это zip', parent: area.id, text: 'Потому что так делает docx.' }, 'claude');
+        const d = store.createRecord('demo', { type: 'decision', title: 'Проект это zip', parent: area.id, text: 'Потому что так делает docx.' }, 'agent');
         const t = store.createRecord('demo', { type: 'task', title: 'Формат файла', parent: area.id, status: 'done', due: '2026-11-20', links: [{ to: d.id, kind: 'because' }] }, 'user');
         store.createRecord('demo', { type: 'task', title: 'Оболочка', parent: area.id }, 'user');
         const records = store.records('demo');
@@ -300,7 +300,7 @@ describe('what the agent sees', () => {
         expect(text).toContain('in: Редактор');
         expect(text).toContain(`← because from [${t.id}] Формат файла`);
         expect(text).toContain('Потому что так делает docx.');
-        expect(text).toContain('claude · create');
+        expect(text).toContain('agent · create');
         expect(search(records, 'docx ZIP').map((r) => r.id)).toEqual([d.id]);
         expect(search(records, 'оболочка')).toHaveLength(1);
         expect(search(records, 'нет такого')).toEqual([]);

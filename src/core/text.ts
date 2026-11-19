@@ -1,10 +1,10 @@
 /**
- * The agent's door to the text of a record. People write in the editor; Claude reads and writes light
+ * The agent's door to the text of a record. People write in the editor; the agent reads and writes light
  * Markdown. The conversion itself is TaoEditor's (`markdownToDoc`, `docToMarkdown`); what stays here is
  * Axis's own rules around it: the profile the store normalises with, "no text" is `null`, and the short
  * excerpt for lists. The editor never converts Markdown by itself; this is a separate, explicit door.
  *
- * Дверь агента к тексту записи. Люди пишут в редакторе; Claude читает и пишет лёгкий Markdown. Само
+ * Дверь агента к тексту записи. Люди пишут в редакторе; агент читает и пишет лёгкий Markdown. Само
  * превращение делает TaoEditor; здесь остались правила Axis вокруг него: профиль, по которому стор
  * приводит документы в порядок, «нет текста» это `null`, и короткая выдержка для списков.
  */

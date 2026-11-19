@@ -77,37 +77,37 @@ describe('the store and exec', () => {
         return 0;
     };
 
-    it('takes exec, or the shortcuts model and effort, on a new task, from the person and from Claude', () => {
+    it('takes exec, or the shortcuts model and effort, on a new task, from the person and from the agent', () => {
         const a = store.createRecord('demo', { type: 'task', title: 'A', exec: { model: 'opus', effort: 'high' } }, 'user');
         expect(a.exec).toEqual({ model: 'opus', effort: 'high' });
-        const b = store.createRecord('demo', { type: 'task', title: 'B', model: 'haiku', effort: 'low' }, 'claude');
+        const b = store.createRecord('demo', { type: 'task', title: 'B', model: 'haiku', effort: 'low' }, 'agent');
         expect(b.exec).toEqual({ model: 'haiku', effort: 'low' });
         expect(store.record('demo', b.id).exec).toEqual({ model: 'haiku', effort: 'low' });
         expect(store.createRecord('demo', { type: 'task', title: 'C' }, 'user').exec).toBeNull();
     });
 
     it('changes only the parts passed and clears a part or the whole', () => {
-        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'sonnet', effort: 'medium' }, 'claude');
+        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'sonnet', effort: 'medium' }, 'agent');
         expect(store.updateRecord('demo', t.id, { exec: { effort: 'high' } }, 'user').exec).toEqual({ model: 'sonnet', effort: 'high' });
-        expect(store.updateRecord('demo', t.id, { model: 'opus' }, 'claude').exec).toEqual({ model: 'opus', effort: 'high' });
+        expect(store.updateRecord('demo', t.id, { model: 'opus' }, 'agent').exec).toEqual({ model: 'opus', effort: 'high' });
         expect(store.updateRecord('demo', t.id, { exec: { model: null } }, 'user').exec).toEqual({ model: null, effort: 'high' });
-        expect(store.updateRecord('demo', t.id, { model: 'haiku' }, 'claude').exec).toEqual({ model: 'haiku', effort: 'high' });
-        expect(store.updateRecord('demo', t.id, { effort: '' }, 'claude').exec).toEqual({ model: 'haiku', effort: null });
+        expect(store.updateRecord('demo', t.id, { model: 'haiku' }, 'agent').exec).toEqual({ model: 'haiku', effort: 'high' });
+        expect(store.updateRecord('demo', t.id, { effort: '' }, 'agent').exec).toEqual({ model: 'haiku', effort: null });
         expect(store.updateRecord('demo', t.id, { exec: { model: '' } }, 'user').exec).toBeNull(); // both parts gone: null
-        const again = store.updateRecord('demo', t.id, { model: 'sonnet', effort: 'low' }, 'claude');
+        const again = store.updateRecord('demo', t.id, { model: 'sonnet', effort: 'low' }, 'agent');
         expect(again.exec).toEqual({ model: 'sonnet', effort: 'low' });
         expect(store.updateRecord('demo', t.id, { exec: null }, 'user').exec).toBeNull();
     });
 
     it('leaves exec alone when nothing about it is passed', () => {
-        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'sonnet' }, 'claude');
+        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'sonnet' }, 'agent');
         expect(store.updateRecord('demo', t.id, { title: 'Renamed', status: 'active' }, 'user').exec).toEqual({ model: 'sonnet', effort: null });
     });
 
     it('refuses an unknown word and a bad shape', () => {
         const t = store.createRecord('demo', { type: 'task', title: 'T' }, 'user');
-        expect(status(() => store.updateRecord('demo', t.id, { model: 'gpt' }, 'claude'))).toBe(400);
-        expect(status(() => store.updateRecord('demo', t.id, { effort: 'extreme' }, 'claude'))).toBe(400);
+        expect(status(() => store.updateRecord('demo', t.id, { model: 'gpt' }, 'agent'))).toBe(400);
+        expect(status(() => store.updateRecord('demo', t.id, { effort: 'extreme' }, 'agent'))).toBe(400);
         expect(status(() => store.updateRecord('demo', t.id, { exec: { model: 'gpt' } }, 'user'))).toBe(400);
         expect(status(() => store.updateRecord('demo', t.id, { exec: 'sonnet' }, 'user'))).toBe(400);
         expect(status(() => store.createRecord('demo', { type: 'task', title: 'x', model: 'gpt' }, 'user'))).toBe(400);
@@ -115,10 +115,10 @@ describe('the store and exec', () => {
     });
 
     it('is kept by a task only: ignored on other types, dropped when the type leaves task', () => {
-        const idea = store.createRecord('demo', { type: 'idea', title: 'I', model: 'opus' }, 'claude');
+        const idea = store.createRecord('demo', { type: 'idea', title: 'I', model: 'opus' }, 'agent');
         expect(idea.exec).toBeNull();
         expect(store.updateRecord('demo', idea.id, { effort: 'high' }, 'user').exec).toBeNull();
-        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'opus', effort: 'high' }, 'claude');
+        const t = store.createRecord('demo', { type: 'task', title: 'T', model: 'opus', effort: 'high' }, 'agent');
         const note = store.updateRecord('demo', t.id, { type: 'note' }, 'user');
         expect(note.exec).toBeNull();
         expect(store.updateRecord('demo', t.id, { type: 'task' }, 'user').exec).toBeNull(); // it does not come back by itself
@@ -128,8 +128,8 @@ describe('the store and exec', () => {
 
     it('writes a journal line with the short value, and none for a change that changes nothing', () => {
         const t = store.createRecord('demo', { type: 'task', title: 'T' }, 'user');
-        store.updateRecord('demo', t.id, { model: 'sonnet', effort: 'high', why: 'tricky' }, 'claude');
-        expect(store.journal('demo')[0]).toMatchObject({ by: 'claude', kind: 'update', changes: { exec: ['', 'sonnet/high'] }, text: 'tricky' });
+        store.updateRecord('demo', t.id, { model: 'sonnet', effort: 'high', why: 'tricky' }, 'agent');
+        expect(store.journal('demo')[0]).toMatchObject({ by: 'agent', kind: 'update', changes: { exec: ['', 'sonnet/high'] }, text: 'tricky' });
         const lines = store.journal('demo').length;
         store.updateRecord('demo', t.id, { model: 'sonnet' }, 'user');
         expect(store.journal('demo')).toHaveLength(lines);
@@ -138,10 +138,10 @@ describe('the store and exec', () => {
     });
 
     it('shows in the outline of the agent and in a full read', () => {
-        const both = store.createRecord('demo', { type: 'task', title: 'Both', model: 'sonnet', effort: 'high' }, 'claude');
-        store.createRecord('demo', { type: 'task', title: 'Model only', model: 'haiku' }, 'claude');
-        store.createRecord('demo', { type: 'task', title: 'Effort only', effort: 'low' }, 'claude');
-        store.createRecord('demo', { type: 'task', title: 'Plain' }, 'claude');
+        const both = store.createRecord('demo', { type: 'task', title: 'Both', model: 'sonnet', effort: 'high' }, 'agent');
+        store.createRecord('demo', { type: 'task', title: 'Model only', model: 'haiku' }, 'agent');
+        store.createRecord('demo', { type: 'task', title: 'Effort only', effort: 'low' }, 'agent');
+        store.createRecord('demo', { type: 'task', title: 'Plain' }, 'agent');
         const lines = outlineText(store.project('demo'), store.records('demo')).split('\n');
         const of = (title: string): string => lines.find((l) => l.includes(`  ${title}`))!;
         expect(of('Both').endsWith('⚙ sonnet/high')).toBe(true);

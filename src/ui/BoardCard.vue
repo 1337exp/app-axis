@@ -14,7 +14,7 @@ import { computed } from 'vue';
 import { STATUSES, isStatus } from '@/core/model';
 import type { AxisRecord, Status } from '@/core/model';
 import { current, useI18n } from '@/i18n';
-import ClaudeMark from './ClaudeMark.vue';
+import AgentMark from './AgentMark.vue';
 import { formatShort } from './format';
 import { isOverdue, statusKeyOf, statusVar } from './marks';
 import StatusMark from './StatusMark.vue';
@@ -71,11 +71,11 @@ const onSelect = (id: string): void => {
             </template>
         </TaoDropdownMenu>
         <span v-if="path.length > 0" class="card__path" :title="path.join(' / ')">{{ path.join(' / ') }}</span>
-        <span v-if="record.due || record.updatedBy === 'claude' || draft || execChip" class="card__meta">
+        <span v-if="record.due || record.updatedBy === 'agent' || draft || execChip" class="card__meta">
             <span v-if="execChip" class="card__exec" :title="t('exec.chipTitle')">{{ execChip }}</span>
             <span v-if="record.due" class="card__due" :class="{ 'card__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
             <TaoIcon v-if="draft" class="card__draft" name="tao-edit" :title="t('tree.hasDraft')" />
-            <ClaudeMark v-if="record.updatedBy === 'claude'" />
+            <AgentMark v-if="record.updatedBy === 'agent'" />
         </span>
     </li>
 </template>

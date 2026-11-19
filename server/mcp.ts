@@ -1,11 +1,11 @@
 /**
- * The MCP server: Claude's own door to Axis. It speaks JSON-RPC over stdio (one JSON per line) and works on the
+ * The MCP server: the agent's own door to Axis. It speaks JSON-RPC over stdio (one JSON per line) and works on the
  * same files as the page, so the page does not have to be running; when it is, it shows every change at once.
  * Everything done through this door is signed "claude" in the journal.
  *
  *   claude mcp add axis --scope user -- node <path>/server/mcp.ts
  *
- * MCP-сервер: собственная дверь Claude в Axis. Говорит по JSON-RPC через stdio (один JSON на строку) и работает
+ * MCP-сервер: собственная дверь агента в Axis. Говорит по JSON-RPC через stdio (один JSON на строку) и работает
  * с теми же файлами, что и страница, поэтому странице не обязательно быть запущенной; если она открыта,
  * то сразу показывает каждое изменение. Всё, что сделано через эту дверь, подписано в журнале «claude».
  */
@@ -18,7 +18,7 @@ import { AxisError, createStore } from './store.ts';
 import type { RecordInput } from './store.ts';
 
 const store = createStore(dataDir());
-const BY = 'claude';
+const BY = 'agent';
 
 type Args = Record<string, unknown>;
 interface Tool {
@@ -59,7 +59,7 @@ const need = (args: Args, key: string): string => {
 const tools: Tool[] = [
     {
         name: 'axis_projects',
-        description: 'List the projects in Axis (the shared design space of the user and Claude) with their progress. Start here when you do not know the project id.',
+        description: 'List the projects in Axis (the shared design space of the user and the agent) with their progress. Start here when you do not know the project id.',
         inputSchema: { type: 'object', properties: {} },
         run() {
             const list = store.projects();
@@ -67,7 +67,7 @@ const tools: Tool[] = [
             return list
                 .map((p) => {
                     const waiting = waitingSeeds(store.records(p.id)).length;
-                    const waits = waiting > 0 ? ` · ${waiting} round${waiting === 1 ? ' waits' : 's wait'} for Claude` : '';
+                    const waits = waiting > 0 ? ` · ${waiting} round${waiting === 1 ? ' waits' : 's wait'} for the agent` : '';
                     return `${p.id}: ${p.title} · ${p.records} records · tasks ${p.progress.done}/${p.progress.total} done${p.progress.questions ? ` · ${p.progress.questions} open questions` : ''}${waits}${p.repo ? ` · repo ${p.repo}` : ''} · updated ${p.updated.slice(0, 10)}`;
                 })
                 .join('\n');
@@ -89,7 +89,7 @@ const tools: Tool[] = [
     {
         name: 'axis_overview',
         description:
-            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read); "✎ draft" marks a record whose text the person is typing right now and has not saved (do not replace that text). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for Claude" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set). Links: "→ because:id" this record links to that one (kinds: because = it exists for that reason, depends = it waits for it, relates = near), "← because:id" that record links to this one; a decision with no "←" has nothing built on it yet.',
+            'The outline of a project: every record as a line "[id] type·status  title", indented by the tree, with progress of branches. "¶" marks a record that has a text (read it with axis_read); "✎ draft" marks a record whose text the person is typing right now and has not saved (do not replace that text). Types: area (a branch), task, idea, decision, question, note. Statuses: open, active, done, dropped (for a decision "done" means accepted, for a question answered). Pass "record" to see one branch only. Brainstorm marks at the end of a line: "seed" (the person\'s starting thought; "⏳ waits for the agent" means the person handed you the turn: it is your move), "variant" with the rating of the person ("+" liked, "-" disliked, "±" both, nothing: not rated; "✎" means a remark, read it with axis_read), "verdict". A task may end with "⚙ sonnet/high": the recommended executor and effort ("⚙ sonnet" no effort set, "⚙ /high" no executor set). Links: "→ because:id" this record links to that one (kinds: because = it exists for that reason, depends = it waits for it, relates = near), "← because:id" that record links to this one; a decision with no "←" has nothing built on it yet.',
         inputSchema: { type: 'object', properties: { project, record: str('Optional: show only the branch under this record.') }, required: ['project'] },
         run(args) {
             const id = need(args, 'project');
@@ -110,7 +110,7 @@ const tools: Tool[] = [
         name: 'axis_add',
         description:
             'Add a record. Use the type that says what it is: a decision records what was chosen and why (put the reasoning in the text), a question is something not known yet, an idea is something to weigh, a task is work to do, an area groups records, a note is everything else. When you create a task, say who should do it with "model" (haiku, sonnet or opus) and how hard to think with "effort" (low, medium or high): it is a recommendation for whoever picks the task up. ' +
-            'To run a brainstorm round: axis_overview shows a seed (an idea with role seed) marked "⏳ waits for Claude" when the person handed you the turn. Read the seed with axis_read, then add 1 to 10 ideas with role "variant" as children of the seed (parent = the seed id; only as many as are worth having, do not pad to ten), each a distinct option with its reasoning in the text. ' +
+            'To run a brainstorm round: axis_overview shows a seed (an idea with role seed) marked "⏳ waits for the agent" when the person handed you the turn. Read the seed with axis_read, then add 1 to 10 ideas with role "variant" as children of the seed (parent = the seed id; only as many as are worth having, do not pad to ten), each a distinct option with its reasoning in the text. ' +
             'Adding variants returns the turn to the person, who rates them (like, dislike, or both = disputed), may leave remarks, and hands the turn back. When the seed waits for you again, read the variants (axis_read shows ratings and remarks) and add one note with role "verdict" as a child of the seed: say what is liked, what is disliked, what is disputed and what to do next. Adding the verdict returns the turn to the person too; you cannot set ratings, remarks or the handed mark yourself.',
         inputSchema: {
             type: 'object',
@@ -234,12 +234,12 @@ Warning: ${draftNote(draft)}` : ''}`;
 ];
 
 const INSTRUCTIONS =
-    'Axis is the design space the user and Claude share: projects as trees of typed records (area, task, idea, decision, question, note) with statuses, links and a journal. ' +
+    'Axis is the design space the user and the agent share: projects as trees of typed records (area, task, idea, decision, question, note) with statuses, links and a journal. ' +
     'When working on a project that is in Axis: read axis_overview first, keep statuses true as work moves, record decisions with their reasons as "decision" records, open questions as "question", ' +
     'and leave an axis_log note at the end of a piece of work. The user sees every change live on the Axis page. ' +
     'Link records as you make them, not only mention an [id] in the text: a task made from a decision or a decision made from a question gets "because", a record that waits for another gets "depends", close records get "relates" ' +
     '(pass "links" to axis_add, or use axis_link later); axis_overview shows them as "→" (this record links to) and "←" (linked to this record). ' +
-    'Brainstorm: a seed marked "⏳ waits for Claude" in axis_overview (or "round waits for Claude" in axis_projects) is the person\'s turn handed to you: offer 1-10 "variant" ideas under it, and after the person rated them add one "verdict" note under the seed (see axis_add).';
+    'Brainstorm: a seed marked "⏳ waits for the agent" in axis_overview (or "round waits for the agent" in axis_projects) is the person\'s turn handed to you: offer 1-10 "variant" ideas under it, and after the person rated them add one "verdict" note under the seed (see axis_add).';
 
 interface Request {
     jsonrpc?: string;

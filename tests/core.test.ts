@@ -176,12 +176,12 @@ describe('text', () => {
         try {
             const store = createStore(root);
             store.createProject({ title: 'Demo', id: 'demo' });
-            const made = store.createRecord('demo', { type: 'note', title: 'N', text: SAMPLE }, 'claude');
+            const made = store.createRecord('demo', { type: 'note', title: 'N', text: SAMPLE }, 'agent');
             const read = recordText(store.record('demo', made.id), store.records('demo'), [], (name) => name);
             // `axis_read` prints the text after the header lines and an empty one; `axis_update` takes it as it is
             const text = read.slice(read.indexOf('\n\n') + 2);
             expect(text).toBe(SAMPLE);
-            const again = store.updateRecord('demo', made.id, { text }, 'claude');
+            const again = store.updateRecord('demo', made.id, { text }, 'agent');
             expect(again.body).not.toBeNull();
             expect(again.body).toEqual(made.body);
         } finally {
@@ -208,9 +208,16 @@ describe('journal', () => {
         });
     });
 
+    it('reads the old author name `claude` as the agent, and an unknown one as the person', () => {
+        expect(parseEntry('{"t":"2026-11-15T10:00:00Z","by":"agent","kind":"note"}')?.by).toBe('agent');
+        expect(parseEntry('{"t":"2026-11-15T10:00:00Z","by":"someone","kind":"note"}')?.by).toBe('user');
+        const old = normalizeRecord({ id: 'abc12345', title: 'Old', createdBy: 'claude', updatedBy: 'user' }, NOW);
+        expect([old?.createdBy, old?.updatedBy]).toEqual(['agent', 'user']);
+    });
+
     it('reads a line and survives a broken one', () => {
         expect(parseEntry('{"t":"2026-11-15T10:00:00Z","by":"claude","kind":"note","record":null,"title":"","text":"hi"}')).toEqual({
-            t: '2026-11-15T10:00:00Z', by: 'claude', kind: 'note', record: null, title: '', text: 'hi',
+            t: '2026-11-15T10:00:00Z', by: 'agent', kind: 'note', record: null, title: '', text: 'hi',
         });
         expect(parseEntry('{not json')).toBeNull();
         expect(parseEntry('"just a string"')).toBeNull();

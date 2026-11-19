@@ -2,13 +2,13 @@
 /**
  * A card of the map: one record. An area is a wider, header-like card with the progress of its branch; the other types
  * show the mark (a task's circle moves its status, with the undo toast), the title up to three lines, the due date, the
- * draft pencil and the mark of Claude. A done or dropped card is quiet. The four small circles on its sides are the handles
+ * draft pencil and the mark of the agent. A done or dropped card is quiet. The four small circles on its sides are the handles
  * a link is dragged from (shown on hover and when the card is selected). The DOM carries the contract of the canvas of TaoUX:
  * `data-node-id` on the root, `data-node-handle` on the body (a double click on it opens the record), `data-pin` on the handles.
  *
  * Карточка карты: одна запись. Раздел это более широкая карточка-шапка с прогрессом своей ветки; остальные типы
  * показывают отметку (кружок задачи двигает статус, с тостом отмены), заголовок до трёх строк, срок, карандаш
- * черновика и отметку Claude. Законченная или отброшенная карточка тихая. Четыре кружка на сторонах это ручки, с которых
+ * черновика и отметку агента. Законченная или отброшенная карточка тихая. Четыре кружка на сторонах это ручки, с которых
  * тянут связь (видны при наведении и у выбранной карточки). В DOM договор холста TaoUX: `data-node-id` на корне,
  * `data-node-handle` на теле (двойной клик открывает запись), `data-pin` на ручках.
  */
@@ -17,7 +17,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type { AxisRecord } from '@/core/model';
 import { hasStatus } from '@/core/model';
 import { current, useI18n } from '@/i18n';
-import ClaudeMark from './ClaudeMark.vue';
+import AgentMark from './AgentMark.vue';
 import { formatShort } from './format';
 import { isOverdue, statusVar } from './marks';
 import StatusMark from './StatusMark.vue';
@@ -82,12 +82,12 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
             <span class="mcard__bar"><span class="mcard__fill" :style="{ width: `${progress.share}%` }"></span><span class="mcard__work" :style="{ width: `${progress.active}%` }"></span></span>
             <span class="mcard__count">{{ progress.done }}/{{ progress.total }}</span>
         </div>
-        <div v-else-if="record.type !== 'area' && (record.due || draft || record.body || record.images.length > 0 || record.updatedBy === 'claude')" class="mcard__meta">
+        <div v-else-if="record.type !== 'area' && (record.due || draft || record.body || record.images.length > 0 || record.updatedBy === 'agent')" class="mcard__meta">
             <span v-if="record.due" class="mcard__due" :class="{ 'mcard__due--late': isOverdue(record) }">{{ formatShort(record.due, current) }}</span>
             <TaoIcon v-if="record.body" class="mcard__icon" name="mark-text" :title="t('tree.hasText')" />
             <TaoIcon v-if="draft" class="mcard__icon mcard__draft" name="tao-edit" :title="t('tree.hasDraft')" />
             <TaoIcon v-if="record.images.length > 0" class="mcard__icon" name="image" />
-            <ClaudeMark v-if="record.updatedBy === 'claude'" class="mcard__claude" />
+            <AgentMark v-if="record.updatedBy === 'agent'" class="mcard__agent" />
         </div>
 
         <span v-for="side in SIDES" :key="side" class="mcard__pin" :class="`mcard__pin--${side}`" :data-pin="side" aria-hidden="true"></span>
@@ -198,7 +198,7 @@ const SIDES = ['top', 'right', 'bottom', 'left'] as const;
     color: var(--tao-color-text);
 }
 
-.mcard__claude {
+.mcard__agent {
     margin-left: auto;
 }
 

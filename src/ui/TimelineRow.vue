@@ -15,7 +15,7 @@ import { computed } from 'vue';
 import { isClosed } from '@/core/model';
 import type { TimelineItem } from '@/core/timeline';
 import { current, tn, useI18n } from '@/i18n';
-import ClaudeMark from './ClaudeMark.vue';
+import AgentMark from './AgentMark.vue';
 import DueButton from './DueButton.vue';
 import { formatWeekdayDay } from './format';
 import StatusMark from './StatusMark.vue';
@@ -53,7 +53,7 @@ const hint = computed(() => {
             <span class="trow__line">
                 <button type="button" class="trow__title" @click="emit('open')">{{ item.record.title }}</button>
                 <TaoIcon v-if="draft" class="trow__draft" name="tao-edit" :title="t('tree.hasDraft')" />
-                <ClaudeMark v-if="item.record.updatedBy === 'claude'" />
+                <AgentMark v-if="item.record.updatedBy === 'agent'" />
             </span>
             <span v-if="path.length > 0" class="trow__path" :title="path.join(' / ')">{{ path.join(' / ') }}</span>
         </div>

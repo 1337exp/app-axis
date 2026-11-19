@@ -27,7 +27,6 @@ import {
     cleanRemark,
     cleanTitle,
     isAssetName,
-    isAuthor,
     isBrainRole,
     isDay,
     isExecEffort,
@@ -39,6 +38,7 @@ import {
     normalizeBrain,
     normalizeExec,
     normalizeRecord,
+    toAuthor,
 } from '../src/core/model.ts';
 import type { Author, AxisDraft, Brain, Exec, AxisProject, AxisRecord, ProjectSummary, RecordLink, RecordType, Status } from '../src/core/model.ts';
 import { isCamera, isPoint, normalizeMap, patchMap } from '../src/core/map.ts';
@@ -85,17 +85,17 @@ export interface RecordInput {
     /**
      * `{ role?, like?, dislike?, remark?, handed? }`: partial, only the keys passed change; `null` clears the whole field.
      * `like`, `dislike` and `remark` stick only to a variant, `handed` only to a seed, the rest is ignored. Only the person
-     * sets all of it: from Claude only `role` is taken.
+     * sets all of it: from the agent only `role` is taken.
      * Частичный объект: меняются только переданные ключи; `null` снимает поле целиком. `like`, `dislike` и `remark`
      * держатся только у варианта, `handed` только у задумки, остальное игнорируется. Всё это ставит только человек:
-     * от Claude берётся лишь `role`.
+     * от агента берётся лишь `role`.
      */
     brain?: unknown;
     /**
      * The recommended executor of a task: `{ model?, effort? }`, partial (only the keys passed change); `null` clears the
-     * whole field, a key set to null or '' clears that part. Only a task keeps it. Both the person and Claude may set it.
+     * whole field, a key set to null or '' clears that part. Only a task keeps it. Both the person and the agent may set it.
      * Рекомендованный исполнитель задачи: `{ model?, effort? }`, частично (меняются только переданные ключи); `null` снимает
-     * поле целиком, ключ null или '' снимает свою часть. Держит его только задача. Ставить могут и человек, и Claude.
+     * поле целиком, ключ null или '' снимает свою часть. Держит его только задача. Ставить могут и человек, и агент.
      */
     exec?: unknown;
     /** Shortcuts for `exec.model` and `exec.effort` (the agent's way); an empty string clears. / Короткие пути к `exec.model` и `exec.effort` (путь агента); пустая строка снимает. */
@@ -271,7 +271,7 @@ export function createStore(root: string): Store {
     const readDraft = (project: string, id: string): AxisDraft | null => {
         const raw = readJson(draftFile(project, id)) as Partial<AxisDraft> | undefined;
         if (!raw || typeof raw !== 'object' || typeof raw.base !== 'string' || raw.base === '') return null;
-        return { body: cleanBody(raw.body), base: raw.base, at: typeof raw.at === 'string' ? raw.at : now(), by: isAuthor(raw.by) ? raw.by : 'user' };
+        return { body: cleanBody(raw.body), base: raw.base, at: typeof raw.at === 'string' ? raw.at : now(), by: toAuthor(raw.by) };
     };
 
     const linksOf = (value: unknown, self: string, all: readonly AxisRecord[]): RecordLink[] => {
@@ -309,7 +309,7 @@ export function createStore(root: string): Store {
             else if (isBrainRole(role)) next = next?.role === role ? next : normalizeBrain({ ...(next ?? {}), role });
             else throw new AxisError(400, 'role: seed | variant | verdict (an empty string clears it)');
         }
-        if (by === 'claude' || next === null) return next;
+        if (by === 'agent' || next === null) return next;
         const patch: Record<string, unknown> = { ...next };
         for (const key of ['like', 'dislike', 'handed'] as const) {
             if (given[key] === undefined) continue;
@@ -351,9 +351,9 @@ export function createStore(root: string): Store {
 
     /**
      * A verdict (or a variant) added under a seed passes the turn back to the person: the seed's `handed` is cleared, with
-     * a line in the journal. A variant does it too, or the seed would keep saying "waits for Claude" while the person rates.
+     * a line in the journal. A variant does it too, or the seed would keep saying "waits for the agent" while the person rates.
      * Вердикт (или вариант) под задумкой возвращает ход человеку: у задумки снимается `handed`, в журнале строка.
-     * Вариант тоже, иначе задумка писала бы «ждёт Claude», пока человек оценивает.
+     * Вариант тоже, иначе задумка писала бы «ждёт агента», пока человек оценивает.
      */
     const passTurnBack = (project: string, all: readonly AxisRecord[], child: AxisRecord, by: Author): void => {
         const role = child.brain?.role;

@@ -35,7 +35,7 @@ export const state = reactive({
 
 export const tree = computed(() => buildTree(state.records));
 export const progress = computed(() => progressOfAll(state.records));
-/** The threads of the brainstorm and how many rounds wait for Claude. / Нити брейншторма и сколько раундов ждут Claude. */
+/** The threads of the brainstorm and how many rounds wait for the agent. / Нити брейншторма и сколько раундов ждут агента. */
 export const threads = computed(() => buildThreads(state.records));
 export const waiting = computed(() => waitingSeeds(state.records).length);
 export const selectedRecord = computed(() => state.records.find((r) => r.id === state.selected) ?? null);
@@ -193,9 +193,9 @@ export async function addRecord(input: RecordPatch & { title: string }): Promise
 
 /**
  * A new idea from typed text: a top-level `idea` with the role `seed` (or a child of `parent`), the first line as the
- * title and the text as the body. `handed` gives the turn to Claude at once (a reply to a verdict does).
+ * title and the text as the body. `handed` gives the turn to the agent at once (a reply to a verdict does).
  * Новая задумка из набранного текста: `idea` верхнего уровня с ролью `seed` (или ребёнок `parent`), первая строка это
- * заголовок, текст это тело. `handed` сразу передаёт ход Claude (так делает ответ на вердикт).
+ * заголовок, текст это тело. `handed` сразу передаёт ход агенту (так делает ответ на вердикт).
  */
 export async function addSeed(text: string, options: { parent?: string; handed?: boolean } = {}): Promise<AxisRecord | null> {
     const idea = ideaFromText(text);

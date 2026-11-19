@@ -48,9 +48,9 @@ export const isAccepted = (verdict: AxisRecord): boolean => verdict.type === 'de
 
 /**
  * Where a round stands. Closed wins over everything (a reply exists or the verdict is accepted); then the turn of
- * Claude (`waiting`); then a verdict nobody answered yet; then variants to rate; then a seed alone.
+ * the agent (`waiting`); then a verdict nobody answered yet; then variants to rate; then a seed alone.
  *
- * На каком шаге раунд. Закрыт важнее всего (есть ответ или вердикт принят); затем ход Claude (`waiting`); затем
+ * На каком шаге раунд. Закрыт важнее всего (есть ответ или вердикт принят); затем ход агента (`waiting`); затем
  * вердикт без ответа; затем варианты для оценки; затем одна задумка.
  */
 export function roundState(round: Round): RoundState {
@@ -61,7 +61,7 @@ export function roundState(round: Round): RoundState {
     return 'draft';
 }
 
-/** Seeds whose turn is passed to Claude. / Задумки, чей ход передан Claude. */
+/** Seeds whose turn is passed to the agent. / Задумки, чей ход передан агенту. */
 export const waitingSeeds = (records: readonly AxisRecord[]): AxisRecord[] =>
     records.filter((r) => r.brain?.role === 'seed' && r.brain.handed === true);
 

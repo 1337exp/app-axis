@@ -19,7 +19,7 @@ import { markRanges } from '@/core/search';
 import { progressOf, shares } from '@/core/tree';
 import type { TreeNode } from '@/core/tree';
 import { current, useI18n } from '@/i18n';
-import ClaudeMark from './ClaudeMark.vue';
+import AgentMark from './AgentMark.vue';
 import { formatShort } from './format';
 import { isOverdue } from './marks';
 import SearchEmpty from './SearchEmpty.vue';
@@ -319,7 +319,7 @@ async function add(): Promise<void> {
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
                             <TaoIcon v-if="hasDraft(r.record.id)" class="row__mark row__draft" name="tao-edit" :title="t('tree.hasDraft')" />
                             <TaoIcon v-if="r.record.images.length > 0" class="row__mark" name="image" />
-                            <ClaudeMark v-if="r.record.updatedBy === 'claude'" />
+                            <AgentMark v-if="r.record.updatedBy === 'agent'" />
                             <span v-if="r.record.due" class="row__due" :class="{ 'row__due--late': isOverdue(r.record) }">{{ formatShort(r.record.due, current) }}</span>
                             <span v-if="r.total > 0" class="row__progress" :title="t('project.tasks', [r.done, r.total])">
                                 <span class="row__bar"><span class="row__fill" :style="{ width: `${r.share}%` }"></span><span class="row__work" :style="{ width: `${r.active}%` }"></span></span>

@@ -22,15 +22,15 @@ const progressText = (p: Progress): string =>
 const RATING_MARK = { good: '+', bad: '-', disputed: '±', neutral: '' } as const;
 
 /**
- * The brainstorm mark at the end of an outline line: a seed (with "waits for Claude" when its turn is passed), a variant
+ * The brainstorm mark at the end of an outline line: a seed (with "waits for the agent" when its turn is passed), a variant
  * with its rating (`+` good, `-` bad, `±` disputed, nothing for neutral) and `✎` when the person left a remark, a verdict.
- * Метка брейншторма в конце строки оглавления: задумка (с «waits for Claude», когда ход передан), вариант с оценкой
+ * Метка брейншторма в конце строки оглавления: задумка (с «waits for the agent», когда ход передан), вариант с оценкой
  * (`+` хорошо, `-` плохо, `±` спорно, ничего для нейтрального) и `✎`, если есть заметка человека, вердикт.
  */
 export function brainMark(r: AxisRecord): string {
     const b = r.brain;
     if (!b) return '';
-    if (b.role === 'seed') return b.handed ? 'seed  ⏳ waits for Claude' : 'seed';
+    if (b.role === 'seed') return b.handed ? 'seed  ⏳ waits for the agent' : 'seed';
     if (b.role === 'variant') return ['variant', RATING_MARK[ratingOf(r)], b.remark ? '✎' : ''].filter(Boolean).join(' ');
     return 'verdict';
 }

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 /**
- * A variant of Claude under an idea: its title and text, two independent marks (good, bad: both on is "disputed") and a
+ * A variant of the agent under an idea: its title and text, two independent marks (good, bad: both on is "disputed") and a
  * short note. A click on a mark saves at once; the note saves when the field loses the focus or on Enter. The marks do not
  * use colour (colour is for status only): the mark that is on is a filled thumb with the accent frame, the shape says which
  * is which, and the words of the rating are in the tooltip and the label for a screen reader.
  *
- * Вариант Claude под задумкой: заголовок и текст, две независимые отметки (хорошо, плохо: обе значит «спорно») и короткая
+ * Вариант агента под задумкой: заголовок и текст, две независимые отметки (хорошо, плохо: обе значит «спорно») и короткая
  * заметка. Клик по отметке сохраняется сразу; заметка сохраняется, когда поле теряет фокус, или по Enter. Отметки без
  * цвета (цвет только у статуса): включённая это залитый палец в рамке акцента, форма говорит, какая из них какая,
  * а слова оценки стоят в подсказке и в подписи для экранного диктора.
  */
-import { TaoIcon, TaoTextarea, TaoTooltip, toast } from '@1337exp/taoui';
+import { TaoIcon, TaoTextarea, toast } from '@1337exp/taoui';
 import { ref, watch } from 'vue';
 import { patchBrain, select } from '@/app/state';
 import { ratingOf } from '@/core/brainstorm';
@@ -59,20 +59,16 @@ async function saveRemark(): Promise<void> {
 <template>
     <li class="variant" :class="`variant--${ratingOf(record)}`">
         <div class="variant__main">
-            <TaoTooltip class="variant__tip" :content="t('brain.openRecord')"><button type="button" class="variant__title" @click="select(record.id)">{{ record.title }}</button></TaoTooltip>
+            <button type="button" class="variant__title" @click="select(record.id)">{{ record.title }}</button>
             <BrainText :body="record.body" />
         </div>
         <div class="variant__rate" role="group" :aria-label="t('brain.ratingOf', [t(`brain.rating.${ratingOf(record)}`)])">
-            <TaoTooltip :content="t('brain.like')">
-                <button type="button" class="thumb" :class="{ 'thumb--on': like() }" :aria-pressed="like()" :aria-label="t('brain.like')" @click="toggle('like')">
-                    <TaoIcon :name="like() ? 'thumb-up-fill' : 'thumb-up'" />
-                </button>
-            </TaoTooltip>
-            <TaoTooltip :content="t('brain.dislike')">
-                <button type="button" class="thumb" :class="{ 'thumb--on': dislike() }" :aria-pressed="dislike()" :aria-label="t('brain.dislike')" @click="toggle('dislike')">
-                    <TaoIcon :name="dislike() ? 'thumb-down-fill' : 'thumb-down'" />
-                </button>
-            </TaoTooltip>
+            <button type="button" class="thumb" :class="{ 'thumb--on': like() }" :aria-pressed="like()" :aria-label="t('brain.like')" @click="toggle('like')">
+                <TaoIcon :name="like() ? 'thumb-up-fill' : 'thumb-up'" />
+            </button>
+            <button type="button" class="thumb" :class="{ 'thumb--on': dislike() }" :aria-pressed="dislike()" :aria-label="t('brain.dislike')" @click="toggle('dislike')">
+                <TaoIcon :name="dislike() ? 'thumb-down-fill' : 'thumb-down'" />
+            </button>
             <span class="variant__word" :class="{ 'variant__word--quiet': ratingOf(record) === 'neutral' }">{{ t(`brain.rating.${ratingOf(record)}`) }}</span>
         </div>
         <TaoTextarea
@@ -110,12 +106,8 @@ async function saveRemark(): Promise<void> {
     gap: var(--tao-space-1);
 }
 
-.variant__tip {
-    align-self: flex-start;
-    max-width: 100%;
-}
-
 .variant__title {
+    align-self: flex-start;
     max-width: 100%;
     padding: 0;
     border: 0;

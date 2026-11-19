@@ -7,7 +7,7 @@
  * Тонкая панель рабочего вида: слева переключатель на каждый тип записи, справа список веток, а между ними то, что
  * вид добавит в слот (лента кладёт туда «Показать завершённые»). Сами выборы живут в `useViewFilter`, тут они только рисуются.
  */
-import { TaoButton, TaoSelect, TaoTooltip } from '@1337exp/taoui';
+import { TaoButton, TaoSelect } from '@1337exp/taoui';
 import { FILTER_TYPES } from '@/core/filter';
 import type { RecordType } from '@/core/model';
 import { useI18n } from '@/i18n';
@@ -30,18 +30,18 @@ const { t } = useI18n();
 <template>
     <div class="filter-bar" :class="{ 'filter-bar--compact': compact }" role="group" :aria-label="t('filter.label')">
         <div class="filter-bar__types" role="group" :aria-label="t('filter.types')">
-            <TaoTooltip v-for="type in FILTER_TYPES" :key="type" :content="t(`type.${type}`)">
-                <TaoButton
-                    variant="ghost"
-                    tone="neutral"
-                    :icon="typeIcon(type)"
-                    :pressed="typeOn(type)"
-                    :aria-label="t(`type.${type}`)"
-                    @update:pressed="(on: boolean) => emit('type', type, on)"
-                >
-                    <span class="filter-bar__text">{{ t(`type.${type}`) }}</span>
-                </TaoButton>
-            </TaoTooltip>
+            <TaoButton
+                v-for="type in FILTER_TYPES"
+                :key="type"
+                variant="ghost"
+                tone="neutral"
+                :icon="typeIcon(type)"
+                :pressed="typeOn(type)"
+                :aria-label="t(`type.${type}`)"
+                @update:pressed="(on: boolean) => emit('type', type, on)"
+            >
+                <span class="filter-bar__text">{{ t(`type.${type}`) }}</span>
+            </TaoButton>
         </div>
         <slot />
         <SearchField class="filter-bar__search" fold />

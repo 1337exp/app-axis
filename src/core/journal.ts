@@ -5,7 +5,7 @@
  * Журнал: кто, что, когда и почему изменил. Это память проекта: строка на изменение, только дописывается.
  */
 import { ratingOf } from './brainstorm.ts';
-import { execText } from './model.ts';
+import { execText, toAuthor } from './model.ts';
 import type { Author, AxisRecord } from './model.ts';
 import { docToText } from './text.ts';
 
@@ -59,9 +59,9 @@ export function diffRecord(before: AxisRecord, after: AxisRecord): JournalEntry[
 
 /**
  * The brainstorm fields as short values: `role` (seed, variant, verdict or empty), `rating` (good, bad, disputed, neutral;
- * empty when the record is not a variant), `remark` (cut short), `handed` (`yes` or empty: the turn is with Claude).
+ * empty when the record is not a variant), `remark` (cut short), `handed` (`yes` or empty: the turn is with the agent).
  * Поля брейншторма короткими значениями: `role` (seed, variant, verdict или пусто), `rating` (good, bad, disputed, neutral;
- * пусто, если запись не вариант), `remark` (обрезана), `handed` (`yes` или пусто: ход у Claude).
+ * пусто, если запись не вариант), `remark` (обрезана), `handed` (`yes` или пусто: ход у агента).
  */
 function brainChanges(before: AxisRecord, after: AxisRecord, changes: NonNullable<JournalEntry['changes']>): void {
     const rating = (r: AxisRecord): string => (r.brain?.role === 'variant' ? ratingOf(r) : '');
@@ -84,7 +84,7 @@ export function parseEntry(line: string): JournalEntry | null {
         if (typeof e !== 'object' || e === null || typeof e.t !== 'string' || typeof e.kind !== 'string') return null;
         return {
             t: e.t,
-            by: e.by === 'claude' ? 'claude' : 'user',
+            by: toAuthor(e.by),
             kind: e.kind,
             record: typeof e.record === 'string' ? e.record : null,
             title: typeof e.title === 'string' ? e.title : '',
