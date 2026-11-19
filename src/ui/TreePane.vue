@@ -314,7 +314,7 @@ async function add(): Promise<void> {
                 </template>
                 <template #label="{ node }">
                     <template v-for="r in [row(node.id)]" :key="node.id">
-                        <span v-if="r" class="row" :class="{ 'row--closed': r.record.status === 'done' || r.record.status === 'dropped', 'row--dropped': r.record.status === 'dropped', 'row--area': r.record.type === 'area', 'row--dim': kept !== null && !isFound(r.record.id) }">
+                        <span v-if="r" class="row" :class="{ 'row--closed': r.record.status === 'done' || r.record.status === 'dropped', 'row--dropped': r.record.status === 'dropped', 'row--area': r.record.type === 'area', 'row--shown': r.record.id === state.selected, 'row--dim': kept !== null && !isFound(r.record.id) }">
                             <span class="row__title"><template v-for="(piece, i) in pieces(r.record.title)" :key="i"><mark v-if="piece.hit" class="row__hit">{{ piece.text }}</mark><template v-else>{{ piece.text }}</template></template></span>
                             <TaoIcon v-if="r.record.body" class="row__mark" name="mark-text" :title="t('tree.hasText')" />
                             <TaoIcon v-if="hasDraft(r.record.id)" class="row__mark row__draft" name="tao-edit" :title="t('tree.hasDraft')" />
@@ -410,6 +410,11 @@ async function add(): Promise<void> {
 
 .row--closed .row__title {
     color: var(--tao-color-text-muted);
+}
+
+/* the record open in the pane: the tree paints its label with the accent (`tone`), so a done or an area row must not paint over it / открытая в панели запись: дерево красит её подпись акцентом (`tone`), поэтому выполненная запись и раздел не должны перекрашивать поверх */
+.row--shown .row__title {
+    color: inherit;
 }
 
 .row--dropped .row__title {
